@@ -1,11 +1,25 @@
 # FastAPi backend server
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .matcher import load_notes, load_transcript
 from .retriever import TranscriptRetriever
 from .llm import classify_note
 
-app = FastAPI(title = "Meeting Proxy")
+app = FastAPI(title="Meeting Proxy")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# retriever = TranscriptRetriever()
+
 retriever = TranscriptRetriever()
 
 @app.get("/")

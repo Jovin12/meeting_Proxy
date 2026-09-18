@@ -1,0 +1,105 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  color: #222;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.header {
+  padding: 40px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+
+.header h1 {
+  margin: 0 0 8px;
+}
+
+.header p {
+  margin: 0;
+  color: #666;
+}
+
+.container {
+  width: min(1000px, 90%);
+  margin: 40px auto;
+}
+
+.analyze-button {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #222;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.analyze-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  margin-top: 20px;
+  padding: 16px;
+  background: #ffe5e5;
+  color: #a00000;
+  border-radius: 8px;
+}
+
+.results-section {
+  margin-top: 40px;
+}
+
+.note-card {
+  background: white;
+  padding: 24px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.note-header h3 {
+  margin: 0;
+}
+
+.status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status.completed {
+  background: #dff5e3;
+  color: #176b2c;
+}
+
+.status.partial {
+  background: #fff2cc;
+  color: #795900;
+}
+
+.status.open {
+  background: #eeeeee;
+  color: #555;
+}
