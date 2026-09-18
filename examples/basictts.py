@@ -3,6 +3,7 @@ import torch
 from pocket_tts import TTSModel
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print(device)
 model = TTSModel.load_model().to(device)
 voice_state = model.get_state_for_audio_prompt("alba")
 

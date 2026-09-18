@@ -1,0 +1,15 @@
+Alice: Okay lets, get started with the meeting.
+
+Bob: Lets start with the database. 
+
+Alice: I agree, Let's go with PostgreSQL, it makes the most sense for our usecase
+
+Bob: For the Architecture, I reviewed the current desing and I think we should separate the API and processing service. 
+
+Alice: That makes sense.
+
+Bob: We should probably deploy this on Azure. 
+
+Alice: Yes, Azure makes sense, but we haven't decided when the deployment should happen
+
+Bob: We'll need to figure out the deployment timeline later.
