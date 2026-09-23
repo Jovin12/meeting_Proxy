@@ -16,86 +16,49 @@ def classify_note(note: str, evidence: list[str]) -> NoteAnalysis:
         f"- {item}" for item in evidence
     )
 
-    prompt = f"""
-        You are analyzing whether a specific meeting note was actually addressed
-        during a meeting.
+    prompt = prompt = f"""
+        You are analyzing a meeting transcript against one meeting note.
 
-        Meeting note:
+        MEETING NOTE:
         {note}
 
-        Relevant conversation:
+        TRANSCRIPT EVIDENCE:
         {evidence_text}
 
-        Classify the meeting note using exactly one of these statuses:
-
-        - completed:
-        The conversation contains explicit evidence that the requested topic
-        was resolved, decided, assigned, or otherwise completed.
-
-        - partial:
-        The conversation explicitly discusses or mentions the topic, but the
-        requested outcome is not fully resolved.
-
-        - open:
-        There is no sufficient evidence that the topic was actually discussed
-        or completed.
+        Determine whether the meeting actually addressed the meeting note.
 
         IMPORTANT RULES:
 
-        1. Judge ONLY from the relevant conversation provided above.
+        1. Semantic similarity alone is NOT evidence that a topic was discussed.
 
-        2. Do NOT assume that something happened merely because the meeting note
-        says that it should happen.
+        2. Mark the note as "open" when the supplied transcript evidence
+        does not directly discuss the subject of the note.
 
-        3. A note describing an action does NOT prove that the action occurred.
+        3. Mark the note as "partial" when the transcript directly discusses
+        the subject but does not clearly reach the requested outcome.
 
-        4. A decision is "completed" only when the participants explicitly make
-        or confirm the decision.
+        4. Mark the note as "completed" only when the transcript contains
+        clear evidence that the requested action, decision, or outcome
+        was completed.
 
-        5. An assignment is "completed" only when a person or responsibility is
-        explicitly assigned.
+        5. Do not infer decisions that were not explicitly made.
 
-        6. A topic being mentioned does not automatically mean the note is
-        completed.
+        6. Do not treat discussion of a related topic as discussion of
+        the requested note.
 
-        7. Do not use evidence from other notes or unrelated topics.
+        7. Return the timestamp of the transcript evidence that best
+        supports your classification.
 
-        8. If the evidence is ambiguous, prefer "partial" or "open" rather than
-        "completed".
+        8. If there is no direct supporting evidence, return null for timestamp.
 
-        9. The evidence field must explain exactly what in the conversation
-        supports the classification.
-
-        10. Do not invent people, decisions, actions, dates, or other information
-            that is not present in the conversation.
-
-        11. The evidence field MUST refer to information from the conversation,
-            NOT information from the meeting note itself.
-
-        12. Keep the evidence explanation short and factual.
-
-        Return ONLY valid JSON matching this exact structure:
+        Return JSON matching this schema:
 
         {{
-            "status": "completed",
-            "evidence": "The participants explicitly agreed to use PostgreSQL.",
-            "confidence": 0.95
+            "status": "open | partial | completed",
+            "evidence": "A concise explanation based only on the transcript evidence.",
+            "confidence": 0.0,
+            "timestamp": "timestamp from the supporting transcript evidence or null"
         }}
-
-        Additional output requirements:
-
-        - "status" must be exactly one of:
-        "completed", "partial", "open"
-
-        - "evidence" must be a string.
-
-        - "confidence" must be a number between 0 and 1.
-
-        - Do not add additional fields.
-
-        - Do not include markdown.
-
-        - Do not include explanations outside the JSON.
     """
 
     response = chat(

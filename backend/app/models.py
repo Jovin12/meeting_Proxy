@@ -1,4 +1,5 @@
 from enum import Enum
+
 from pydantic import BaseModel, Field
 
 
@@ -11,16 +12,34 @@ class NoteStatus(str, Enum):
 class NoteAnalysis(BaseModel):
     status: NoteStatus
     evidence: str
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float
+    timestamp: str | None = None
 
 
 class Note(BaseModel):
     id: int
     text: str
-    status: NoteStatus = NoteStatus.OPEN
+    status: NoteStatus
+
     evidence: str | None = None
     confidence: float | None = None
+
+    # NEW
+    timestamp: str | None = None
 
 
 class MeetingAnalysis(BaseModel):
     notes: list[Note]
+
+
+class TranscriptEvent(BaseModel):
+    timestamp: str
+    speaker: str | None = None
+    text: str
+
+
+class MeetingState(BaseModel):
+    meeting_id: str
+    active: bool = True
+    transcript: list[TranscriptEvent] = []
+    notes: list[Note] = []

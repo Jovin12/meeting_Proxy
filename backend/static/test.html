@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Meeting Proxy — Stream Test</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+  h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+  section { margin-bottom: 2rem; }
+  button {
+    padding: 0.4rem 0.9rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input, textarea {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+  .row > * { flex: 1; }
+  .status {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    color: #888;
+    margin-left: 0.75rem;
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 800px) {
+    .cols { grid-template-columns: 1fr; }
+  }
+  ul.notes { list-style: none; padding: 0; margin: 0; }
+  ul.notes li {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #4444;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  ul.notes li[data-status="completed"] .text {
+    text-decoration: line-through;
+    opacity: 0.55;
+  }
+  ul.notes li[data-status="partial"] .text {
+    text-decoration: underline dotted;
+  }
+  .meta {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: #888;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .evidence { font-size: 0.85rem; color: #aaa; }
+  .ws-state { font-size: 0.85rem; }
+  .ws-state[data-open="true"] { color: #2a8; }
+  .ws-state[data-open="false"] { color: #c44; }
+  pre.state {
+    background: #0001;
+    border: 1px solid #4444;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0;
+    font-size: 0.8rem;
+    font-family: ui-monospace, monospace;
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .panel-head h2 { margin: 0; }
+  .source {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: #888;
+  }
+</style>
+</head>
+<body>
+
+<h1>Meeting Proxy — Stream Test</h1>
+
+<section>
+  <button id="start">Start meeting</button>
+  <button id="end" disabled>End meeting</button>
+  <button id="refresh" disabled>Refresh from /state</button>
+  <span id="ws-state" class="ws-state" data-open="false">not connected</span>
+  <div class="meta" style="margin-top:0.5rem">
+    <span>meeting_id: <code id="mid">—</code></span>
+    <span>elapsed: <code id="elapsed">00:00</code></span>
+  </div>
+</section>
+
+<section>
+  <div class="row">
+    <input id="speaker" placeholder="speaker (e.g. Alice)" value="Alice">
+  </div>
+  <div class="row">
+    <textarea id="text" rows="2" placeholder="caption text…"></textarea>
+  </div>
+  <div class="row" style="flex: 0 0 auto">
+    <button id="send" disabled>Send event</button>
+    <button id="send-quick" disabled title="send a canned event">Send canned</button>
+  </div>
+  <p class="status" id="status"></p>
+</section>
+
+<section class="cols">
+  <div>
+    <div class="panel-head">
+      <h2>Notes</h2>
+    </div>
+    <ul class="notes" id="notes"></ul>
+  </div>
+  <div>
+    <div class="panel-head">
+      <h2>Raw /meeting/state</h2>
+      <span class="source" id="state-source">—</span>
+    </div>
+    <pre class="state" id="raw-state">(nothing yet)</pre>
+  </div>
+</section>
+
+<script>
+(() => {
+  let ws = null;
+  let meetingId = null;
+  let startedAt = null;
+  let elapsedTimer = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  const setStatus = (msg) => { $("status").textContent = msg; };
+
+  const setWsState = (open) => {
+    const el = $("ws-state");
+    el.dataset.open = String(open);
+    el.textContent = open ? "connected" : "not connected";
+  };
+
+  const elapsedLabel = () => {
+    if (!startedAt) return "00:00";
+    const s = Math.floor((Date.now() - startedAt) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
+  const tickElapsed = () => { $("elapsed").textContent = elapsedLabel(); };
+
+  const renderNotes = (notes) => {
+    const ul = $("notes");
+    ul.innerHTML = "";
+    for (const n of notes) {
+      const li = document.createElement("li");
+      li.dataset.status = n.status;
+
+      const text = document.createElement("div");
+      text.className = "text";
+      text.textContent = n.text;
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = `
+        <span>id: ${n.id}</span>
+        <span>status: ${n.status}</span>
+        <span>ts: ${n.timestamp ?? "—"}</span>
+        <span>conf: ${n.confidence ?? "—"}</span>
+      `;
+
+      const evidence = document.createElement("div");
+      evidence.className = "evidence";
+      evidence.textContent = n.evidence ?? "";
+
+      li.appendChild(text);
+      li.appendChild(meta);
+      li.appendChild(evidence);
+      ul.appendChild(li);
+    }
+  };
+
+  const renderRawState = (state, source) => {
+    $("raw-state").textContent = JSON.stringify(state, null, 2);
+    $("state-source").textContent = `via ${source} @ ${new Date().toLocaleTimeString()}`;
+  };
+
+  const applyState = (state, source) => {
+    if (state.meeting_id) {
+      meetingId = state.meeting_id;
+      $("mid").textContent = meetingId;
+    }
+    if (Array.isArray(state.notes)) {
+      renderNotes(state.notes);
+    }
+    renderRawState(state, source);
+  };
+
+  const openWs = () => {
+    const url = `ws://${location.host}/meeting/${meetingId}/ws`;
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      setWsState(true);
+      $("send").disabled = false;
+      $("send-quick").disabled = false;
+      $("refresh").disabled = false;
+      setStatus("connected");
+    };
+
+    ws.onclose = () => {
+      setWsState(false);
+      $("send").disabled = true;
+      $("send-quick").disabled = true;
+      // keep refresh enabled if we have a meeting id, so you can still poll
+      $("refresh").disabled = !meetingId;
+    };
+
+    ws.onerror = (e) => {
+      setStatus("ws error — see console");
+      console.error(e);
+    };
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.error) {
+        setStatus(`error: ${msg.error}`);
+        return;
+      }
+      if (msg.type === "pong") return;
+      if (msg.type === "error") {
+        setStatus(`error: ${msg.detail}`);
+        return;
+      }
+      // Otherwise it's a MeetingState
+      applyState(msg, "ws");
+      setStatus("state updated");
+    };
+  };
+
+  const sendEvent = (speaker, text) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const payload = {
+      type: "event",
+      timestamp: elapsedLabel(),
+      speaker,
+      text,
+    };
+    ws.send(JSON.stringify(payload));
+    setStatus(`sent @ ${payload.timestamp}`);
+  };
+
+  $("start").addEventListener("click", async () => {
+    setStatus("starting…");
+    const res = await fetch("/meeting/start", { method: "POST" });
+    if (!res.ok) {
+      setStatus(`start failed: ${res.status}`);
+      return;
+    }
+    const state = await res.json();
+    applyState(state, "POST /meeting/start");
+    startedAt = Date.now();
+    tickElapsed();
+    elapsedTimer = setInterval(tickElapsed, 1000);
+    openWs();
+    $("start").disabled = true;
+    $("end").disabled = false;
+  });
+
+  $("end").addEventListener("click", async () => {
+    if (!meetingId) return;
+    await fetch(`/meeting/${meetingId}/end`, { method: "POST" });
+    if (ws) ws.close();
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    $("start").disabled = false;
+    $("end").disabled = true;
+    setStatus("ended");
+  });
+
+  $("refresh").addEventListener("click", async () => {
+    if (!meetingId) return;
+    const res = await fetch(`/meeting/${meetingId}/state`);
+    if (!res.ok) {
+      setStatus(`refresh failed: ${res.status}`);
+      return;
+    }
+    const state = await res.json();
+    applyState(state, "GET /meeting/state");
+    setStatus("state refreshed");
+  });
+
+  $("send").addEventListener("click", () => {
+    const speaker = $("speaker").value.trim() || "Unknown";
+    const text = $("text").value.trim();
+    if (!text) return;
+    sendEvent(speaker, text);
+    $("text").value = "";
+  });
+
+  // Canned sequence matching the notes.md topics, for quick smoke tests.
+  const CANNED = [
+    { speaker: "Alice", text: "We need to decide what database we're going to use." },
+    { speaker: "Bob",   text: "I've been looking at PostgreSQL." },
+    { speaker: "Alice", text: "Agreed, let's use PostgreSQL." },
+    { speaker: "Bob",   text: "I'll draft the deployment timeline by Friday." },
+    { speaker: "Alice", text: "Great. Carol, can you own the monitoring setup?" },
+    { speaker: "Carol", text: "Yes, I'll take monitoring." },
+    { speaker: "Bob",   text: "Let's hold off on Azure until we see the timeline." },
+  ];
+  let cannedIndex = 0;
+  $("send-quick").addEventListener("click", () => {
+    const c = CANNED[cannedIndex % CANNED.length];
+    cannedIndex++;
+    sendEvent(c.speaker, c.text);
+  });
+
+  // Enter inside the textarea sends, Shift+Enter inserts newline.
+  $("text").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      $("send").click();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
