@@ -25,15 +25,16 @@ let reconnectTimer = null;
 let reconnectAttempt = 0;
 
 // ----------------------------------------------------------------
-// Sidebar (Opera)
+// Browser-independent meeting panel
 // ----------------------------------------------------------------
 
-if (chrome.action?.onClicked && chrome.sidebarAction?.open) {
+if (chrome.action?.onClicked) {
   chrome.action.onClicked.addListener(async (tab) => {
+    if (!tab.id) return;
     try {
-      await chrome.sidebarAction.open();
+      await chrome.tabs.sendMessage(tab.id, { type: "toggle-panel" });
     } catch (e) {
-      console.error("[bg] sidebarAction.open failed:", e);
+      console.warn("[bg] panel is only available on a Google Meet tab:", e);
     }
   });
 }
@@ -80,6 +81,13 @@ function broadcastToSidePanel(msg) {
   });
 }
 
+async function backendJson(path, options = {}) {
+  const { backendUrl } = await getSettings();
+  const res = await fetch(`${backendUrl}${path}`, options);
+  if (!res.ok) throw new Error(`backend request failed: ${res.status}`);
+  return res.json();
+}
+
 // ----------------------------------------------------------------
 // WebSocket lifecycle
 // ----------------------------------------------------------------
@@ -89,14 +97,18 @@ async function openSocket(id) {
   const url = `${backendWsUrl}/meeting/${id}/ws`;
 
   console.log("[bg] opening socket", url);
-  ws = new WebSocket(url);
+  return new Promise((resolve, reject) => {
+    let opened = false;
+    ws = new WebSocket(url);
 
-  ws.onopen = () => {
-    console.log("[bg] socket open");
-    reconnectAttempt = 0;
-    startKeepAlive();
-    broadcastToSidePanel({ type: "ws-status", open: true });
-  };
+    ws.onopen = () => {
+      opened = true;
+      console.log("[bg] socket open");
+      reconnectAttempt = 0;
+      startKeepAlive();
+      broadcastToSidePanel({ type: "ws-status", open: true });
+      resolve();
+    };
 
   ws.onmessage = (ev) => {
     let msg;
@@ -119,16 +131,19 @@ async function openSocket(id) {
     broadcastToSidePanel({ type: "state", state: msg });
   };
 
-  ws.onclose = () => {
-    console.log("[bg] socket closed");
-    stopKeepAlive();
-    broadcastToSidePanel({ type: "ws-status", open: false });
-    scheduleReconnect();
-  };
+    ws.onclose = () => {
+      console.log("[bg] socket closed");
+      stopKeepAlive();
+      broadcastToSidePanel({ type: "ws-status", open: false });
+      if (!opened) reject(new Error("WebSocket closed before connecting"));
+      scheduleReconnect();
+    };
 
-  ws.onerror = (e) => {
-    console.error("[bg] socket error", e);
-  };
+    ws.onerror = (e) => {
+      console.error("[bg] socket error", e);
+      if (!opened) reject(new Error("WebSocket connection failed"));
+    };
+  });
 }
 
 function scheduleReconnect() {
@@ -193,7 +208,12 @@ async function handleMessage(msg, sender) {
   switch (msg.type) {
     case "start-meeting": {
       const { backendUrl } = await getSettings();
-      const res = await fetch(`${backendUrl}/meeting/start`, { method: "POST" });
+            const options = { method: "POST" };
+            if (Array.isArray(msg.notes)) {
+                options.headers = { "Content-Type": "application/json" };
+                options.body = JSON.stringify({ notes: msg.notes });
+            }
+            const res = await fetch(`${backendUrl}/meeting/start`, options);
       if (!res.ok) throw new Error(`start failed: ${res.status}`);
       const state = await res.json();
       meetingId = state.meeting_id;
@@ -202,6 +222,47 @@ async function handleMessage(msg, sender) {
       broadcastToSidePanel({ type: "state", state });
       return { ok: true, meetingId, state };
     }
+
+        case "get-default-notes":
+          return { ok: true, ...(await backendJson("/notes/default")) };
+
+        case "get-meetings":
+          return { ok: true, meetings: await backendJson("/meetings") };
+
+        case "get-meeting":
+          return { ok: true, meeting: await backendJson(`/meetings/${msg.meetingId}`) };
+
+        case "add-note": {
+          if (!meetingId) return { ok: false, error: "no active meeting" };
+          const state = await backendJson(`/meeting/${meetingId}/notes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: msg.text }),
+          });
+          lastState = state;
+          broadcastToSidePanel({ type: "state", state });
+          return { ok: true, state };
+        }
+
+        case "update-notes": {
+          const notes = Array.isArray(msg.notes) ? msg.notes : [];
+          await backendJson("/notes/default", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes }),
+          });
+
+          if (!meetingId) return { ok: true, notes };
+
+          const state = await backendJson(`/meeting/${meetingId}/notes`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes }),
+          });
+          lastState = state;
+          broadcastToSidePanel({ type: "state", state });
+          return { ok: true, notes, state };
+        }
 
     case "end-meeting": {
       if (!meetingId) return { ok: true };

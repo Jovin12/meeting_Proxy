@@ -38,6 +38,18 @@ class TranscriptEvent(BaseModel):
     text: str
 
 
+class MeetingStartRequest(BaseModel):
+    notes: list[str] | None = None
+
+
+class NoteCreateRequest(BaseModel):
+    text: str
+
+
+class NotesUpdateRequest(BaseModel):
+    notes: list[str]
+
+
 class MeetingState(BaseModel):
     meeting_id: str
     active: bool = True

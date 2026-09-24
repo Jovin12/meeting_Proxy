@@ -3,7 +3,6 @@
   "name": "Meeting Proxy",
   "version": "0.1.0",
   "description": "Live meeting notes that strike through as topics are discussed.",
-  "minimum_chrome_version": "116",
 
   "permissions": [
     "storage",
@@ -28,23 +27,25 @@
     }
   ],
 
-  "sidebar_action": {
+  "action": {
+    "default_title": "Meeting Proxy",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    },
-    "default_title": "Meeting Proxy",
-    "default_panel": "sidepanel.html"
-  },
-
-  "action": {
-    "default_title": "Meeting Proxy"
+    }
   },
 
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["sidepanel.html", "sidepanel.js"],
+      "matches": ["https://meet.google.com/*"]
+    }
+  ]
 }

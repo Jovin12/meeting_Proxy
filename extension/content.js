@@ -23,6 +23,73 @@ const NAME_SELECTOR = ".NWpY1d";
 
 const STABLE_MS = 800;         // how long text must be unchanged before we emit
 const MAX_EVENT_CHARS = 500;   // safety cap
+const PANEL_HOST_ID = "meeting-proxy-panel-host";
+
+// ----------------------------------------------------------------
+// Browser-independent panel
+// ----------------------------------------------------------------
+
+function togglePanel() {
+  const existing = document.getElementById(PANEL_HOST_ID);
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const host = document.createElement("div");
+  host.id = PANEL_HOST_ID;
+  const shadow = host.attachShadow({ mode: "closed" });
+
+  const frame = document.createElement("iframe");
+  frame.title = "Meeting Proxy";
+  frame.src = chrome.runtime.getURL("sidepanel.html");
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.title = "Close Meeting Proxy";
+  close.textContent = "×";
+  close.addEventListener("click", () => host.remove());
+
+  const style = document.createElement("style");
+  style.textContent = `
+    :host { all: initial; }
+    .panel {
+      position: fixed;
+      z-index: 2147483647;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(380px, 92vw);
+      background: Canvas;
+      box-shadow: -4px 0 18px rgb(0 0 0 / 25%);
+    }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+    button {
+      position: absolute;
+      z-index: 1;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 50%;
+      background: rgb(0 0 0 / 12%);
+      color: CanvasText;
+      font: 22px/24px sans-serif;
+      cursor: pointer;
+    }
+  `;
+
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  panel.append(frame, close);
+  shadow.append(style, panel);
+  document.documentElement.appendChild(host);
+}
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "toggle-panel") togglePanel();
+});
 
 // ----------------------------------------------------------------
 // Timestamp helper

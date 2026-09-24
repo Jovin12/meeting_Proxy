@@ -33,6 +33,34 @@ class MeetingStateEngine:
 
         self.retriever = retriever
 
+    def add_note(self, text: str) -> MeetingState:
+        cleaned_text = text.strip()
+        if not cleaned_text:
+            raise ValueError("Note text cannot be empty.")
+
+        next_id = max((note.id for note in self.state.notes), default=-1) + 1
+        self.state.notes.append(
+            Note(id=next_id, text=cleaned_text, status=NoteStatus.OPEN)
+        )
+        return self.state
+
+    def replace_notes(self, texts: list[str]) -> MeetingState:
+        existing = {note.text: note for note in self.state.notes}
+        self.state.notes = []
+
+        for index, text in enumerate(texts):
+            cleaned_text = text.strip()
+            if not cleaned_text:
+                continue
+            note = existing.get(cleaned_text)
+            if note is None:
+                note = Note(id=index, text=cleaned_text, status=NoteStatus.OPEN)
+            else:
+                note.id = index
+            self.state.notes.append(note)
+
+        return self.state
+
     def add_event(self, event: TranscriptEvent) -> MeetingState:
         """
         Add a transcript event and re-analyze the meeting notes.

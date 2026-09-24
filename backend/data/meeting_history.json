@@ -1,0 +1,387 @@
+[
+  {
+    "meeting_id": "191c2079-ba6b-4200-9a05-4ede519d1633",
+    "started_at": "2026-09-24T14:35:00.735604+00:00",
+    "ended_at": "2026-09-24T14:35:00.749231+00:00",
+    "state": {
+      "meeting_id": "191c2079-ba6b-4200-9a05-4ede519d1633",
+      "active": false,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Review launch checklist",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Confirm owner for follow-up",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "d96e5343-8705-49f1-ad4f-b06ced94ea8c",
+    "started_at": "2026-09-24T14:36:12.533940+00:00",
+    "ended_at": "2026-09-24T14:36:30.367592+00:00",
+    "state": {
+      "meeting_id": "d96e5343-8705-49f1-ad4f-b06ced94ea8c",
+      "active": false,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on the database for the new backend",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Review the backend Architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 2,
+          "text": "Discuss the deployment timeline",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 3,
+          "text": "Assign monitoring responsibilities",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 4,
+          "text": "Decide whether to use Azure",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "b69429f6-0b16-440c-a8bb-3aef35ba4d00",
+    "started_at": "2026-09-24T14:36:38.862246+00:00",
+    "ended_at": "2026-09-24T14:36:41.352398+00:00",
+    "state": {
+      "meeting_id": "b69429f6-0b16-440c-a8bb-3aef35ba4d00",
+      "active": false,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on the database for the new backend",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Review the backend Architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 2,
+          "text": "Discuss the deployment timeline",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 3,
+          "text": "Assign monitoring responsibilities",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 4,
+          "text": "Decide whether to use Azure",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 5,
+          "text": "greetings",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "e25f9079-3072-4c62-a41b-8e03a0d7520c",
+    "started_at": "2026-09-24T14:38:57.841066+00:00",
+    "ended_at": "2026-09-24T14:38:57.909232+00:00",
+    "state": {
+      "meeting_id": "e25f9079-3072-4c62-a41b-8e03a0d7520c",
+      "active": false,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on the database for the new backend",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Review the backend Architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 2,
+          "text": "Discuss the deployment timeline",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 3,
+          "text": "Assign monitoring responsibilities",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 4,
+          "text": "Decide whether to use Azure",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 5,
+          "text": "Added while meeting is active",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "450b4b05-903d-4a0a-ac4a-458fc69dd306",
+    "started_at": "2026-09-24T14:39:45.299165+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "450b4b05-903d-4a0a-ac4a-458fc69dd306",
+      "active": true,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on the database for the new backend",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Review the backend Architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 2,
+          "text": "Discuss the deployment timeline",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 3,
+          "text": "Assign monitoring responsibilities",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 4,
+          "text": "Decide whether to use Azure",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 5,
+          "text": "idk",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "3b2231d9-c016-4720-b989-4116d3342a0c",
+    "started_at": "2026-09-24T14:42:05.998712+00:00",
+    "ended_at": "2026-09-24T14:42:06.028897+00:00",
+    "state": {
+      "meeting_id": "3b2231d9-c016-4720-b989-4116d3342a0c",
+      "active": false,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Review backend architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Add deployment owner",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "c582495b-1589-4c69-9ca5-b3ca79306627",
+    "started_at": "2026-09-24T14:43:03.447469+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "c582495b-1589-4c69-9ca5-b3ca79306627",
+      "active": true,
+      "transcript": [],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on the database for the new backend",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 1,
+          "text": "Review the backend Architecture",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 2,
+          "text": "Discuss the deployment timeline",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        },
+        {
+          "id": 3,
+          "text": "Assign monitoring responsibilities",
+          "status": "open",
+          "evidence": null,
+          "confidence": null,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "9a904ea9-e0f6-473c-bc8e-3beab3515201",
+    "started_at": "2026-09-24T14:53:52.480991+00:00",
+    "ended_at": "2026-09-24T14:55:06.547926+00:00",
+    "state": {
+      "meeting_id": "9a904ea9-e0f6-473c-bc8e-3beab3515201",
+      "active": false,
+      "transcript": [
+        {
+          "timestamp": "01:07",
+          "speaker": "You",
+          "text": "We're moving things ready."
+        },
+        {
+          "timestamp": "01:08",
+          "speaker": "You",
+          "text": "Everything's ready!"
+        },
+        {
+          "timestamp": "01:26",
+          "speaker": "You",
+          "text": "Does this don't work?"
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "61958542-47ed-4b92-9353-bf34632863a6",
+    "started_at": "2026-09-24T15:53:19.986679+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "61958542-47ed-4b92-9353-bf34632863a6",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:36",
+          "speaker": "You",
+          "text": "Hi!"
+        }
+      ],
+      "notes": [
+        {
+          "id": 0,
+          "text": "hi",
+          "status": "open",
+          "evidence": "The meeting note 'hi' was not discussed as a standalone topic, but rather as part of an initial greeting.",
+          "confidence": 1.0,
+          "timestamp": null
+        }
+      ]
+    }
+  }
+]

@@ -1,67 +1,782 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Meeting Proxy</title>
-<style>
-  :root { color-scheme: light dark; }
-  body {
-    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-    margin: 0;
-    padding: 1rem;
-    line-height: 1.4;
-    font-size: 13px;
-  }
-  h1 { font-size: 1rem; margin: 0 0 0.75rem; }
-  button { font: inherit; padding: 0.35rem 0.8rem; cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
-  .ws { font-size: 0.75rem; font-family: ui-monospace, monospace; }
-  .ws[data-open="true"] { color: #2a8; }
-  .ws[data-open="false"] { color: #c44; }
-  .meta { font-size: 0.75rem; color: #888; margin-bottom: 0.75rem; word-break: break-all; }
-  ul.notes { list-style: none; padding: 0; margin: 0; }
-  ul.notes li {
-    padding: 0.5rem 0.6rem;
-    border: 1px solid #4444;
-    border-radius: 6px;
-    margin-bottom: 0.4rem;
-  }
-  ul.notes li[data-status="completed"] .text {
-    text-decoration: line-through;
-    opacity: 0.55;
-  }
-  ul.notes li[data-status="partial"] .text {
-    text-decoration: underline dotted;
-  }
-  .n-meta {
-    font-family: ui-monospace, monospace;
-    font-size: 0.7rem;
-    color: #888;
-    margin-top: 0.2rem;
-    display: flex;
-    gap: 0.75rem;
-  }
-  .evidence { font-size: 0.75rem; color: #aaa; margin-top: 0.2rem; }
-  .status { font-size: 0.75rem; color: #888; min-height: 1em; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Meeting Proxy</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #08263a;
+      --page-deep: #061d2d;
+      --plate: #1a3647;
+      --line: #355263;
+      --line-soft: #294655;
+      --text: #dae7e3;
+      --muted: #b7cbc6;
+      --muted-dim: #97b2ae;
+      --ice: #02fdf6;
+      --blue: #0482f1;
+      --berry: #d81e5b;
+      --font-display: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+      --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-section: 26px;
+      --radius-well: 18px;
+      --radius-control: 14px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 280px;
+      background: var(--page);
+      scrollbar-color: var(--line) var(--page);
+    }
+
+    body {
+      min-width: 280px;
+      margin: 0;
+      background: var(--page);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button,
+    textarea,
+    select {
+      color: inherit;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled,
+    select:disabled,
+    textarea:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
+    button:focus-visible,
+    summary:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--ice);
+      outline-offset: 3px;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 380px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 20px 22px;
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .brand {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--plate);
+      color: var(--ice);
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-name {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.035em;
+      line-height: 1;
+    }
+
+    .brand-caption {
+      margin: 4px 0 0;
+      color: var(--muted-dim);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .connection-status {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .connection-dot,
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+    }
+
+    .connection-dot {
+      border: 1px solid var(--muted-dim);
+      background: transparent;
+    }
+
+    #ws[data-open="true"] .connection-dot {
+      border-color: var(--ice);
+      background: var(--ice);
+      box-shadow: 0 0 0 3px rgb(2 253 246 / 10%);
+    }
+
+    .session {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .session-copy {
+      min-width: 0;
+    }
+
+    .section-eyebrow {
+      margin: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .session-title {
+      margin: 4px 0 0;
+      font-family: var(--font-display);
+      font-size: 25px;
+      font-weight: 700;
+      line-height: 1.05;
+    }
+
+    .session-description {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .session-badge {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--page-deep);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .session-badge .status-dot {
+      border: 1px solid var(--muted-dim);
+      background: transparent;
+    }
+
+    .session[data-view="active"] .session-badge {
+      color: var(--ice);
+    }
+
+    .session[data-view="active"] .session-badge .status-dot {
+      border-color: var(--ice);
+      background: var(--ice);
+    }
+
+    .session[data-view="ended"] .session-badge .status-dot {
+      border: 0;
+      background: var(--muted-dim);
+    }
+
+    .session-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 650;
+      transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+
+    .button:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+
+    .button-primary {
+      flex: 1;
+      background: var(--ice);
+      color: var(--page-deep);
+    }
+
+    .button-secondary {
+      border-color: var(--line);
+      background: transparent;
+      color: var(--text);
+    }
+
+    .button-danger {
+      border-color: rgb(216 30 91 / 70%);
+      background: transparent;
+      color: var(--text);
+    }
+
+    .button-danger:hover:not(:disabled) {
+      background: rgb(216 30 91 / 12%);
+    }
+
+    .button-quiet {
+      min-height: 40px;
+      padding: 0 12px;
+      border-color: var(--line);
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .section {
+      margin-top: var(--space-section);
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin: 0 0 var(--space-3);
+    }
+
+    .section-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 23px;
+      font-weight: 700;
+      line-height: 1.05;
+    }
+
+    .section-count {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .transcript-well {
+      overflow: hidden;
+      border-radius: var(--radius-well);
+      background: var(--page-deep);
+    }
+
+    .transcript-list,
+    .notes-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .transcript-list {
+      max-height: 246px;
+      overflow-y: auto;
+      padding: 0 15px;
+      scrollbar-color: var(--line) var(--page-deep);
+      scrollbar-width: thin;
+    }
+
+    .transcript-entry {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .transcript-entry:last-child {
+      border-bottom: 0;
+    }
+
+    .transcript-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin-bottom: 5px;
+    }
+
+    .transcript-speaker {
+      color: var(--text);
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .transcript-time {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .transcript-copy {
+      margin: 0;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .empty-state {
+      margin: 0;
+      padding: 15px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .note-empty-evidence {
+      margin-top: 6px;
+      padding: 0;
+      font-size: 12px;
+    }
+
+    .notes-section {
+      margin-top: 28px;
+      padding-top: 19px;
+      border-top: 1px solid var(--line);
+    }
+
+    .notes-description {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .notes-list {
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .note-item {
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .note-item:last-child {
+      border-bottom: 0;
+    }
+
+    .note-status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .note-item[data-status="open"] .note-status-line,
+    .note-item[data-status="open"] .note-confidence {
+      color: var(--muted);
+    }
+
+    .note-item[data-status="open"] .status-dot {
+      border: 1px solid var(--muted);
+      background: transparent;
+    }
+
+    .note-item[data-status="partial"] .note-status-line,
+    .note-item[data-status="partial"] .note-confidence {
+      color: var(--blue);
+    }
+
+    .note-item[data-status="partial"] .status-dot {
+      background: var(--blue);
+    }
+
+    .note-item[data-status="completed"] .note-status-line,
+    .note-item[data-status="completed"] .note-confidence {
+      color: var(--ice);
+    }
+
+    .note-item[data-status="completed"] .status-dot {
+      background: var(--ice);
+    }
+
+    .note-main {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-top: 5px;
+    }
+
+    .note-text {
+      min-width: 0;
+      margin: 0;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 550;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .note-confidence {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .note-evidence {
+      margin-top: 8px;
+      border-left: 2px solid var(--line);
+      padding-left: 11px;
+    }
+
+    .note-item[data-status="partial"] .note-evidence {
+      border-left-color: var(--blue);
+    }
+
+    .note-item[data-status="completed"] .note-evidence {
+      border-left-color: var(--ice);
+    }
+
+    .note-evidence summary {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      list-style: none;
+    }
+
+    .note-evidence summary::-webkit-details-marker,
+    .editor-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .note-evidence summary::after,
+    .editor-summary::after {
+      content: "＋";
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    .note-evidence[open] summary::after,
+    .editor[open] .editor-summary::after {
+      content: "−";
+    }
+
+    .note-evidence[open] summary {
+      min-height: 36px;
+    }
+
+    .evidence-copy {
+      margin: 2px 0 0;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .editor,
+    .history-section {
+      margin-top: 20px;
+      padding-top: 13px;
+      border-top: 1px solid var(--line);
+    }
+
+    .editor-summary {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+      list-style: none;
+    }
+
+    .editor-summary::after {
+      content: "＋";
+    }
+
+    .editor[open] .editor-summary {
+      margin-bottom: 8px;
+    }
+
+    .editor-label,
+    .history-label {
+      display: block;
+      margin: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .notes-input,
+    .history-select {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      min-height: 44px;
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      background: var(--page-deep);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .notes-input {
+      min-height: 94px;
+      padding: 11px 12px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .notes-input::placeholder {
+      color: var(--muted-dim);
+    }
+
+    .history-select {
+      padding: 0 12px;
+      text-overflow: ellipsis;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: 9px;
+    }
+
+    .editor-actions .button-primary {
+      min-width: 0;
+    }
+
+    .status-message {
+      min-height: 18px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .status-message[data-kind="success"] {
+      color: var(--ice);
+    }
+
+    .status-message[data-kind="error"] {
+      color: #ff91b2;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 320px) {
+      .panel {
+        padding-right: 15px;
+        padding-left: 15px;
+      }
+
+      .session {
+        align-items: flex-start;
+      }
+
+      .session-badge {
+        padding-right: 8px;
+        padding-left: 8px;
+      }
+
+      .note-text {
+        font-size: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
 </head>
 <body>
+  <main class="panel">
+    <header class="brand-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">MP</div>
+        <div>
+          <p class="brand-name">MEETING PROXY</p>
+          <p class="brand-caption">Caption instrument</p>
+        </div>
+      </div>
+      <div class="connection-status" id="ws" data-open="false" role="status" aria-label="Local service connection">
+        <span class="connection-dot" aria-hidden="true"></span>
+        <span class="connection-label">Not connected</span>
+      </div>
+    </header>
 
-<h1>Meeting Proxy</h1>
+    <section class="session" id="session" data-view="idle" aria-label="Current meeting">
+      <div class="session-copy">
+        <p class="section-eyebrow" id="sessionContext">Current meeting</p>
+        <h1 class="session-title" id="sessionTitle">Ready for your meeting</h1>
+        <p class="session-description" id="sessionDescription">Start a meeting to see captions and note matches here.</p>
+      </div>
+      <span class="session-badge" id="sessionBadge"><span class="status-dot" aria-hidden="true"></span><span id="sessionBadgeText">Idle</span></span>
+    </section>
+    <div class="session-actions">
+      <button class="button button-primary" id="start" type="button">Start meeting</button>
+      <button class="button button-danger" id="end" type="button" disabled hidden>End meeting</button>
+      <button class="button button-quiet" id="returnToLive" type="button" hidden>Return to live</button>
+    </div>
+    <p class="sr-only" id="meta">Meeting ID unavailable</p>
 
-<div class="row">
-  <button id="start">Start meeting</button>
-  <button id="end" disabled>End</button>
-  <span class="ws" id="ws" data-open="false">not connected</span>
-</div>
+    <section class="section" aria-labelledby="transcriptHeading">
+      <header class="section-heading">
+        <h2 class="section-title" id="transcriptHeading">Live transcript</h2>
+        <span class="section-count" id="transcriptCount">0 entries</span>
+      </header>
+      <div class="transcript-well">
+        <ol class="transcript-list" id="transcript" aria-label="Meeting transcript">
+          <li class="empty-state">No captions received yet. Start a meeting and enable captions in Google Meet.</li>
+        </ol>
+      </div>
+    </section>
 
-<div class="meta" id="meta">meeting_id: —</div>
+    <section class="notes-section" aria-labelledby="notesHeading">
+      <header class="section-heading">
+        <div>
+          <h2 class="section-title" id="notesHeading">Meeting notes</h2>
+          <p class="notes-description">Matched against captured captions</p>
+        </div>
+        <span class="section-count" id="notesCount">0 notes</span>
+      </header>
+      <ul class="notes-list" id="notes" aria-label="Meeting note matches">
+        <li class="empty-state">No meeting notes yet. Add notes below before starting.</li>
+      </ul>
+    </section>
 
-<ul class="notes" id="notes"></ul>
+    <details class="editor" id="notesEditor">
+      <summary class="editor-summary">Edit meeting notes</summary>
+      <fieldset class="editor-fields" id="notesFieldset">
+        <legend class="sr-only">Meeting notes</legend>
+        <label class="editor-label" for="notesInput">One note per line</label>
+        <textarea class="notes-input" id="notesInput" placeholder="Add one note per line"></textarea>
+        <div class="editor-actions">
+          <button class="button button-primary" id="updateNotes" type="button">Save notes</button>
+          <button class="button button-secondary" id="uploadNotes" type="button">Upload file</button>
+          <input id="notesFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden>
+        </div>
+      </fieldset>
+    </details>
 
-<div class="status" id="status"></div>
+    <section class="history-section" aria-labelledby="historyHeading">
+      <div class="section-heading">
+        <label class="history-label" id="historyHeading" for="history">Saved meetings</label>
+      </div>
+      <select class="history-select" id="history" aria-label="Review a saved meeting">
+        <option value="">Select a meeting to review</option>
+      </select>
+    </section>
 
-<script src="sidepanel.js" type="module"></script>
+    <p class="status-message" id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+  </main>
+  <script src="sidepanel.js" type="module"></script>
 </body>
 </html>

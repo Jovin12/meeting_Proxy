@@ -1,3 +1,7 @@
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +15,9 @@ from .models import (
     Note,
     NoteStatus,
     MeetingAnalysis,
+    NoteCreateRequest,
+    NotesUpdateRequest,
+    MeetingStartRequest,
     TranscriptEvent,
     MeetingState,
 )
@@ -21,6 +28,7 @@ app = FastAPI(title="Meeting Proxy")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"^(chrome-extension|moz-extension|opera-extension)://[^/]+$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +37,40 @@ app.add_middleware(
 retriever = TranscriptRetriever()
 
 meeting_engines: dict[str, MeetingStateEngine] = {}
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+HISTORY_PATH = DATA_DIR / "meeting_history.json"
+
+
+def _load_history() -> list[dict]:
+    if not HISTORY_PATH.exists():
+        return []
+    try:
+        with HISTORY_PATH.open("r", encoding="utf-8") as history_file:
+            value = json.load(history_file)
+        return value if isinstance(value, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+meeting_history = _load_history()
+
+
+def _persist_history() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path = HISTORY_PATH.with_suffix(".tmp")
+    with temporary_path.open("w", encoding="utf-8") as history_file:
+        json.dump(meeting_history, history_file, indent=2)
+    temporary_path.replace(HISTORY_PATH)
+
+
+def _save_meeting_state(state: MeetingState, ended_at: str | None = None) -> None:
+    for record in meeting_history:
+        if record["meeting_id"] == state.meeting_id:
+            record["state"] = state.model_dump(mode="json")
+            if ended_at is not None:
+                record["ended_at"] = ended_at
+            _persist_history()
+            return
 
 
 def _get_engine(meeting_id: str) -> MeetingStateEngine:
@@ -88,8 +130,13 @@ def analyze_meeting():
 # --------------------------------------------------
 
 @app.post("/meeting/start")
-def start_meeting():
-    raw_notes = load_notes("data/notes.md")
+def start_meeting(request: MeetingStartRequest | None = None):
+    raw_notes = (
+        request.notes
+        if request is not None and request.notes is not None
+        else load_notes(str(DATA_DIR / "notes.md"))
+    )
+    raw_notes = [note.strip() for note in raw_notes if note.strip()]
 
     notes = [
         Note(id=i, text=text, status=NoteStatus.OPEN)
@@ -104,7 +151,54 @@ def start_meeting():
         retriever=TranscriptRetriever(),
     )
 
-    return meeting_engines[meeting_id].get_state()
+    state = meeting_engines[meeting_id].get_state()
+    meeting_history.append({
+        "meeting_id": meeting_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": None,
+        "state": state.model_dump(mode="json"),
+    })
+    _persist_history()
+    return state
+
+
+@app.get("/notes/default")
+def get_default_notes():
+    return {"notes": load_notes(str(DATA_DIR / "notes.md"))}
+
+
+@app.put("/notes/default")
+def update_default_notes(request: NotesUpdateRequest):
+    notes = [note.strip() for note in request.notes if note.strip()]
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with (DATA_DIR / "notes.md").open("w", encoding="utf-8") as notes_file:
+        notes_file.write("\n".join(f"- {note}" for note in notes))
+        if notes:
+            notes_file.write("\n")
+    return {"notes": notes}
+
+
+@app.get("/meetings")
+def list_meetings():
+    return [
+        {
+            "meeting_id": record["meeting_id"],
+            "started_at": record["started_at"],
+            "ended_at": record["ended_at"],
+            "active": record["state"].get("active", False),
+            "note_count": len(record["state"].get("notes", [])),
+            "transcript_count": len(record["state"].get("transcript", [])),
+        }
+        for record in reversed(meeting_history)
+    ]
+
+
+@app.get("/meetings/{meeting_id}")
+def get_saved_meeting(meeting_id: str):
+    for record in meeting_history:
+        if record["meeting_id"] == meeting_id:
+            return record
+    raise HTTPException(404, f"No saved meeting with id {meeting_id}.")
 
 
 # --------------------------------------------------
@@ -126,7 +220,9 @@ def get_meeting_state_flat():
 
 @app.post("/meeting/end")
 def end_meeting_flat():
-    return _latest_engine().end_meeting()
+    state = _latest_engine().end_meeting()
+    _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
+    return state
 
 
 # --------------------------------------------------
@@ -141,6 +237,26 @@ def add_meeting_event(meeting_id: str, event: TranscriptEvent):
     return engine.add_event(event)
 
 
+@app.post("/meeting/{meeting_id}/notes")
+def add_meeting_note(meeting_id: str, request: NoteCreateRequest):
+    engine = _get_engine(meeting_id)
+    if not engine.state.active:
+        raise HTTPException(400, "Meeting has already ended.")
+    state = engine.add_note(request.text)
+    _save_meeting_state(state)
+    return state
+
+
+@app.put("/meeting/{meeting_id}/notes")
+def replace_meeting_notes(meeting_id: str, request: NotesUpdateRequest):
+    engine = _get_engine(meeting_id)
+    if not engine.state.active:
+        raise HTTPException(400, "Meeting has already ended.")
+    state = engine.replace_notes(request.notes)
+    _save_meeting_state(state)
+    return state
+
+
 @app.get("/meeting/{meeting_id}/state")
 def get_meeting_state(meeting_id: str):
     return _get_engine(meeting_id).get_state()
@@ -148,7 +264,9 @@ def get_meeting_state(meeting_id: str):
 
 @app.post("/meeting/{meeting_id}/end")
 def end_meeting(meeting_id: str):
-    return _get_engine(meeting_id).end_meeting()
+    state = _get_engine(meeting_id).end_meeting()
+    _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
+    return state
 
 
 @app.delete("/meeting/{meeting_id}")
@@ -193,6 +311,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
                 # add_event does embeddings + LLM call — keep the loop unblocked.
                 state = await run_in_threadpool(engine.add_event, event)
+                _save_meeting_state(state)
 
                 await websocket.send_json(state.model_dump(mode="json"))
 
