@@ -3,19 +3,27 @@
 Meeting Proxy is a local meeting-analysis service with a browser extension for
 Google Meet. The extension observes finalized captions, sends them to the
 backend as timestamped transcript events, and displays meeting-note progress
-in a sidebar. The backend also retains the original file-based `/analyze`
-endpoint for batch analysis.
+in a custom panel embedded on the right side of the Google Meet tab. The
+backend also retains the original file-based `/analyze` endpoint for batch
+analysis.
 
 The current streaming workflow is:
 
 1. Open Google Meet with captions enabled and load the extension.
-2. Start a meeting from the extension sidebar, which calls
-  `POST /meeting/start` and opens a WebSocket.
+2. Click the extension action to open the custom panel, optionally edit or
+  upload one note per line, and start a meeting. The panel calls
+  `POST /meeting/start` with the current notes and opens a WebSocket.
 3. The content script waits for a caption row to be stable, then forwards a
   `TranscriptEvent` through the extension service worker.
 4. The backend rebuilds the transcript, re-indexes it, and updates eligible
   notes against the latest retrieved evidence.
-5. The sidebar renders each returned `MeetingState` and can end the meeting.
+5. The panel renders each returned `MeetingState`, including the live
+  transcript and note matches, and can end the meeting.
+
+Notes can be saved during a meeting without restarting it. The panel's
+**Save notes** action updates both the default `backend/data/notes.md` file and
+the active meeting's note list. Saved meetings can be selected later from the
+panel and reviewed with their transcript and final note matches.
 
 The React app still exercises the older one-click `/analyze` flow. The
 extension and the interactive streaming smoke-test page use the event-based
@@ -24,9 +32,13 @@ flow. The smoke-test page is available at
 
 ## How Event-to-Event Updates Work
 
-`POST /meeting/start` loads bullet notes from `backend/data/notes.md`, assigns
-each note an `open` status, creates a UUID meeting ID, and stores a
-`MeetingStateEngine` in the in-memory `meeting_engines` dictionary.
+`POST /meeting/start` accepts an optional JSON body. If `notes` is supplied,
+those strings become the meeting's notes; an empty list intentionally creates a
+meeting with no notes. If the body is omitted or `notes` is `null`, bullet notes
+are loaded from `backend/data/notes.md`. Each note receives an `open` status, a
+UUID meeting ID is created, and a `MeetingStateEngine` is stored in the
+in-memory `meeting_engines` dictionary. A copy of the initial state and UTC
+start time is also written to `backend/data/meeting_history.json`.
 
 Each event has this shape:
 
@@ -55,7 +67,18 @@ Returns `{"message": "Meeting Proxy API"}`.
 
 ### `POST /meeting/start`
 
-Takes no body. Returns the initial `MeetingState`:
+Accepts an optional body:
+
+```json
+{
+  "notes": [
+    "Decide on the database",
+    "Confirm the deployment owner"
+  ]
+}
+```
+
+Returns the initial `MeetingState`:
 
 ```json
 {
@@ -88,8 +111,40 @@ the most recently created meeting.
 
 ### `POST /meeting/{meeting_id}/end`
 
-Sets `active` to `false` and returns the final state. The flat equivalent is
-`POST /meeting/end`.
+Sets `active` to `false`, persists the final state and UTC end time, and
+returns the final state. The flat equivalent is `POST /meeting/end`.
+
+### `GET /notes/default`
+
+Returns the current bullet notes from `backend/data/notes.md`.
+
+### `PUT /notes/default`
+
+Replaces `backend/data/notes.md` with the supplied note list. Empty strings are
+discarded and each remaining note is written as a Markdown bullet:
+
+```json
+{
+  "notes": ["Review the architecture", "Confirm the timeline"]
+}
+```
+
+### `PUT /meeting/{meeting_id}/notes`
+
+Replaces the notes for an active meeting. Notes with unchanged text retain
+their current status, evidence, confidence, and timestamp. New notes start as
+`open`; removed notes are removed from the active meeting. The updated state
+is persisted and returned.
+
+### `GET /meetings`
+
+Returns saved meeting summaries in newest-first order, including meeting ID,
+UTC start/end times, active state, note count, and transcript count.
+
+### `GET /meetings/{meeting_id}`
+
+Returns a saved meeting record containing its timestamps and complete saved
+`MeetingState`.
 
 ### `DELETE /meeting/{meeting_id}`
 
@@ -137,8 +192,11 @@ complete transcript once, and returns one analysis per note:
 ```
 
 Paths in this endpoint are relative to the backend working directory. Missing
-files raise a normal file error. The API has no authentication or persistence;
-meeting state and Chroma data are lost when the process exits.
+files raise a normal file error. The live meeting registry and Chroma data are
+in memory, but completed and in-progress meeting snapshots are also written to
+`backend/data/meeting_history.json` for later review. The history file is not a
+database and is loaded when the backend starts; active meetings cannot be
+resumed after a process restart.
 
 ## Analysis Pipeline
 
@@ -236,7 +294,8 @@ meeting_proxy/
 |   |   |-- llm.py            Ollama note classification
 |   |   |-- state_engine.py   Event-to-event meeting state updates
 |   |-- data/
-|   |   |-- notes.md          Bullet-list notes loaded at meeting start
+|   |   |-- notes.md          Default bullet-list notes and saved note edits
+|   |   |-- meeting_history.json Persisted meeting snapshots and timestamps
 |   |   |-- transcript.txt    Transcript used by legacy /analyze
 |   |-- static/
 |       |-- test.html        Browser smoke test for REST and WebSocket flow
@@ -244,8 +303,8 @@ meeting_proxy/
 |   |-- manifest.json        Manifest V3 extension configuration
 |   |-- background.js        Backend session, WebSocket, reconnect, and relay
 |   |-- content.js           Google Meet caption observer and debounce logic
-|   |-- sidepanel.html       Sidebar UI markup and styles
-|   |-- sidepanel.js         Sidebar state rendering and controls
+|   |-- sidepanel.html       Custom panel UI markup and styles
+|   |-- sidepanel.js         Panel state rendering and controls
 |   |-- settings.js          Stored backend URL settings helpers
 |   |-- icons/                Extension icons
 |-- frontend/
@@ -270,19 +329,27 @@ meeting_proxy/
 
 ### `backend/app/main.py`
 
-Creates the FastAPI app, configures CORS for `http://localhost:5173`, creates
-the legacy module-level retriever, and owns the in-memory
-`meeting_engines: dict[str, MeetingStateEngine]` registry.
+Creates the FastAPI app, configures CORS for `http://localhost:5173` and
+browser extension origins, creates the legacy module-level retriever, and
+owns the in-memory `meeting_engines: dict[str, MeetingStateEngine]` registry.
+It also loads and persists `backend/data/meeting_history.json`.
 
 - `_get_engine(meeting_id)` returns a meeting engine or raises HTTP 404.
 - `_latest_engine()` returns the newest meeting or raises HTTP 400.
 - `root()` implements `GET /`.
 - `analyze_meeting()` implements the legacy file-based `/analyze` pipeline.
-- `start_meeting()` loads notes, creates `Note` objects, generates a UUID, and
-  stores a new engine with its own retriever.
+- `start_meeting()` accepts optional custom notes, creates `Note` objects,
+  generates a UUID, stores a new engine with its own retriever, and records the
+  initial meeting snapshot.
+- `get_default_notes()` and `update_default_notes()` read and rewrite
+  `backend/data/notes.md`.
+- `replace_meeting_notes()` replaces notes on an active meeting and preserves
+  analysis fields for unchanged note text.
+- `list_meetings()` and `get_saved_meeting()` expose persisted meeting history.
 - `add_meeting_event_flat(event)` and `add_meeting_event(meeting_id, event)`
   pass a `TranscriptEvent` to `MeetingStateEngine.add_event()`.
-- The state and end routes delegate to `get_state()` and `end_meeting()`.
+- The state and end routes delegate to `get_state()` and `end_meeting()`;
+  end routes persist the final state and end time.
 - `delete_meeting(meeting_id)` removes a meeting from the registry.
 - `meeting_ws(websocket, meeting_id)` sends initial state, converts event
   payloads to `TranscriptEvent`, runs `add_event()` in a thread pool, and
@@ -297,6 +364,9 @@ needed.
 
 - `__init__(meeting_id, notes, retriever)` creates a `MeetingState` and stores
   the meeting's `TranscriptRetriever`.
+- `add_note(text)` appends one open note to the active state.
+- `replace_notes(texts)` replaces the note list, preserving analysis fields for
+  note text that remains unchanged.
 - `add_event(event)` appends one `TranscriptEvent`, rebuilds and indexes the
   complete transcript, then classifies only notes that are not completed.
   `_STATUS_RANK` prevents status regression, and completed notes are frozen.
@@ -310,6 +380,9 @@ needed.
 - `Note` is a meeting note plus optional analysis fields and timestamp.
 - `MeetingAnalysis` wraps a list of notes for the batch response contract.
 - `TranscriptEvent` requires `timestamp` and `text`; `speaker` is optional.
+- `MeetingStartRequest` accepts optional custom note text for meeting startup.
+- `NoteCreateRequest` represents a single note for the legacy add-note route.
+- `NotesUpdateRequest` represents a complete replacement note list.
 - `MeetingState` contains `meeting_id`, `active`, all transcript events, and
   the current notes.
 
@@ -358,13 +431,19 @@ Meet (`https://meet.google.com/*`). It is the intended live-caption client.
    Chromium-based browser.
 3. Enable **Developer mode**, choose **Load unpacked**, and select the
    repository's `extension/` directory.
-4. Open Google Meet, enable captions, open the Meeting Proxy sidebar, and
-   click **Start meeting**.
+4. Open Google Meet, enable captions, click the Meeting Proxy extension action
+  to open the custom right-side panel, and click **Start meeting**.
+
+The panel is injected into the Google Meet page by `content.js`; it is not a
+browser-owned Chrome side panel or Opera sidebar. This avoids relying on
+browser-specific sidebar APIs. The embedded panel loads `sidepanel.html` from
+the extension and communicates with the service worker through runtime
+messages.
 
 The default backend URLs are `http://127.0.0.1:8000` for REST and
 `ws://127.0.0.1:8000` for WebSocket traffic. They are stored with
 `chrome.storage.sync`; `settings.js` exposes `getSettings()` and
-`setSettings(partial)`, although the current sidebar has no settings form.
+`setSettings(partial)`, although the current panel has no settings form.
 The manifest host permissions must cover any backend URL that is configured.
 
 ### Extension Message Flow
@@ -374,18 +453,28 @@ The manifest host permissions must cover any backend URL that is configured.
   applies a 500-character safety threshold in the scraper, and sends
   `caption` messages with an elapsed `MM:SS` timestamp. The current code does
   not truncate text when that threshold is exceeded.
-- `background.js` handles `start-meeting`, `end-meeting`, `get-status`, and
-  `caption` messages. It starts the backend meeting, owns the WebSocket,
-  forwards caption events, broadcasts state to the sidebar, reconnects with
-  exponential backoff up to 30 seconds, and sends ping keepalives.
-- `sidepanel.js` starts and ends meetings, renders note status/evidence, and
-  resynchronizes from the service worker when reopened.
-- `sidepanel.html` provides the sidebar controls and note list.
+- `background.js` handles `start-meeting`, `end-meeting`, `get-status`,
+  `get-default-notes`, `update-notes`, `get-meetings`, `get-meeting`, and
+  `caption` messages. It starts meetings with the panel's note list, owns the
+  WebSocket, forwards caption events, broadcasts state to the panel,
+  reconnects with exponential backoff up to 30 seconds, and sends ping
+  keepalives.
+- `sidepanel.js` manages live and saved-meeting views, starts and ends
+  meetings, edits or uploads notes, saves note changes, renders the live
+  transcript, renders note status/evidence, and resynchronizes from the
+  service worker when reopened. While reviewing a saved meeting, the editor
+  is disabled; **Return to live** restores the current session.
+- `sidepanel.html` provides the custom panel UI: connection status, meeting
+  controls, live transcript, current note matches, collapsible note editor,
+  upload/save controls, and saved-meeting history.
 - `manifest.json` declares the service worker, Google Meet content script,
-  sidebar action, storage/tabs/alarms permissions, and local backend hosts.
+  toolbar action, storage/tabs/alarms permissions, local backend hosts, and
+  web-accessible panel resources. It does not depend on `side_panel` or
+  `sidebar_action` browser APIs.
 
-The current extension is designed for Chromium/Opera-style Manifest V3
-behavior and requires the caption DOM selectors in `content.js` to continue
+The extension uses common Manifest V3 APIs and a page-injected custom panel so
+the panel behavior is portable across browsers that support the extension
+APIs. It still requires the caption DOM selectors in `content.js` to continue
 matching the Google Meet UI.
 
 ## Voice Examples
@@ -414,12 +503,18 @@ recording is involved.
   Meet's caption DOM.
 - Every event re-embeds the complete transcript. Completed notes skip Ollama,
   but open and partial notes are still reclassified as the meeting grows.
-- Meetings, retriever collections, and the meeting registry are in memory.
-- There is no authentication, database persistence, or meeting recovery.
+- Retriever collections and the active meeting registry are in memory. Meeting
+  snapshots are persisted in a JSON history file, but active meetings cannot
+  be resumed after a backend restart.
+- There is no authentication or database-backed concurrency control for the
+  JSON history file.
 - The React UI still uses the legacy `/analyze` endpoint instead of the
   event/WebSocket flow.
 - The extension has no settings UI, so changing stored backend URLs requires
   using the extension storage API or editing the code.
 - Google Meet DOM selectors may change and break caption capture.
+- The custom panel is only injected into Google Meet tabs where the content
+  script is permitted to run; clicking the extension action on another page
+  does not open a panel.
 - The backend and React URLs are local and hard-coded for development.
 - Ollama must be running with the configured model available.
