@@ -5,20 +5,22 @@ captions, compares them with a list of meeting notes, and reports which notes
 are open, partially addressed, or completed.
 
 The main experience is a Manifest V3 browser extension. It captures finalized
-captions from Google Meet, sends them to a local FastAPI backend, and displays
-the live transcript and evolving note status in a custom right-side panel. A local Ollama model and semantic
-retrieval pipeline provide the evidence used for each classification.
+Google Meet captions and displays the live transcript and note status in a
+custom panel. The panel separates meeting notes from **User Proxy**, which can
+switch Meet's outgoing audio between its selected microphone and generated
+Pocket TTS speech. Ollama and semantic retrieval provide evidence for note
+classification.
 
 ## High-Level Architecture
 
-![Meeting Proxy high-level architecture](examples/imgs/high_lvl_architecture.jpg)
+![Meeting Proxy detailed architecture](examples/imgs/detailed_architecture.png)
 
 The system is organized into four areas:
 
 - **Client interfaces:** the Google Meet browser extension, the legacy React
   frontend, and the static WebSocket smoke-test page.
 - **Backend service:** FastAPI receives transcript events, manages meeting
-  state, and exposes REST and WebSocket endpoints.
+  state, and provides the Pocket TTS WAV endpoint.
 - **Analysis pipeline:** transcript events are chunked and embedded by
   `TranscriptRetriever`, stored in in-memory ChromaDB, and matched to notes.
 - **External AI service:** local Ollama runs `llama3.2:3b` and returns a
@@ -57,7 +59,7 @@ captured transcript and final note matches.
 The repository includes a virtual environment in `meet_proxy/`. The checked-in
 `backend/requirements.txt` is currently empty, so use an environment that
 already contains FastAPI, Uvicorn, ChromaDB, Sentence Transformers, Ollama,
-Pydantic, and their dependencies.
+Pydantic, Pocket TTS, PyTorch, SciPy, and their dependencies.
 
 ## Setup
 
@@ -91,8 +93,9 @@ The API runs at `http://127.0.0.1:8000`.
 5. Open Google Meet and enable captions.
 6. Click the Meeting Proxy extension action to open the custom panel on the
   right side of the Google Meet tab.
-7. Optionally enter notes or upload a `.txt`/`.md` file, then select
-  **Start meeting**.
+7. In **Minutes of the Meeting**, optionally enter notes or upload a
+  `.txt`/`.md` file, then select **Start meeting**. Use **User Proxy** to
+  select microphone or TTS audio and speak entered text.
 
 The extension uses these local defaults:
 
@@ -121,6 +124,11 @@ refresh state through REST, and display raw meeting state.
 The React frontend still uses the batch `/analyze` endpoint. It reads the
 sample transcript from `backend/data/transcript.txt` and does not use the live
 WebSocket workflow.
+
+### Text-to-Speech
+
+`POST /generate-tts` accepts `{"text":"Hello!"}` and returns WAV bytes as
+`audio/wav`. The extension uses this response in the User Proxy tab.
 
 ```powershell
 cd .\frontend
@@ -218,7 +226,7 @@ meeting_proxy/
 |-- backend/       FastAPI service, analysis pipeline, notes, and test page
 |-- extension/     Manifest V3 Google Meet caption client and custom panel
 |-- frontend/      Legacy React/Vite batch-analysis UI
-|-- examples/      Voice examples and the high-level architecture image
+|-- examples/      Voice examples and the detailed architecture image
 |-- meet_proxy/    Local Python virtual environment
 |-- readme.md      Project overview and setup guide
 |-- understandingFiles_readme.md
@@ -235,6 +243,7 @@ Important runtime files include:
 - `backend/app/llm.py`: Ollama prompt and structured response validation.
 - `extension/content.js`: Google Meet caption observer.
 - `extension/background.js`: backend session and WebSocket relay.
+- `extension/meet_audio_bridge.js`: experimental Meet outgoing-audio bridge.
 - `extension/sidepanel.js`: live transcript, note-state, editing, and history UI.
 - `backend/data/notes.md`: default note list, updated by the panel's Save notes
   action.
@@ -253,6 +262,9 @@ Important runtime files include:
 - Each new event re-indexes the full transcript; unfinished notes may still
   trigger another LLM call.
 - The extension depends on Google Meet caption DOM selectors that may change.
+- User Proxy replaces Meet's WebRTC audio sender through an experimental
+  page-world bridge; Google Meet provides no supported extension API for this,
+  so compatibility requires live testing and may change with Meet updates.
 - There is no authentication, multi-user persistence, or speech-to-text
   service outside Google Meet captions.
 - The React frontend is a legacy batch client and is separate from the live
