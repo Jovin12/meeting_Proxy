@@ -13,7 +13,7 @@ classification.
 
 ## High-Level Architecture
 
-![Meeting Proxy detailed architecture](examples/imgs/detailed_architecture.png)
+![Meeting Proxy detailed architecture](examples/imgs/high_lvl_architecture_audioMix.png)
 
 The system is organized into four areas:
 
