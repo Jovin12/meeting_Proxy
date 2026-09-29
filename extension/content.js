@@ -24,6 +24,7 @@ const NAME_SELECTOR = ".NWpY1d";
 const STABLE_MS = 800;         // how long text must be unchanged before we emit
 const MAX_EVENT_CHARS = 500;   // safety cap
 const PANEL_HOST_ID = "meeting-proxy-panel-host";
+let panelFrame = null;
 
 // ----------------------------------------------------------------
 // Browser-independent panel
@@ -32,7 +33,9 @@ const PANEL_HOST_ID = "meeting-proxy-panel-host";
 function togglePanel() {
   const existing = document.getElementById(PANEL_HOST_ID);
   if (existing) {
+    window.postMessage({ source: "meeting-proxy-content", type: "disable" }, location.origin);
     existing.remove();
+    panelFrame = null;
     return;
   }
 
@@ -42,7 +45,9 @@ function togglePanel() {
 
   const frame = document.createElement("iframe");
   frame.title = "Meeting Proxy";
+  frame.allow = "microphone";
   frame.src = chrome.runtime.getURL("sidepanel.html");
+  panelFrame = frame;
 
   const close = document.createElement("button");
   close.type = "button";
@@ -86,6 +91,14 @@ function togglePanel() {
   shadow.append(style, panel);
   document.documentElement.appendChild(host);
 }
+
+window.addEventListener("message", (event) => {
+  if (event.source !== window || event.data?.source !== "meeting-proxy-audio-bridge") return;
+  if (!panelFrame?.contentWindow) return;
+
+  const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
+  panelFrame.contentWindow.postMessage(event.data, extensionOrigin);
+});
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === "toggle-panel") togglePanel();

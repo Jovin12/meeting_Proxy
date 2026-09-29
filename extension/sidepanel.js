@@ -19,6 +19,195 @@ let latestLiveState = null;
 let notesDirty = false;
 let savedMeetings = [];
 
+class AudioMixer {
+  constructor() {
+    this.enabled = false;
+    this.mode = "microphone";
+    this.pendingRequests = new Map();
+    this.requestSequence = 0;
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent || event.origin !== "https://meet.google.com") return;
+      if (event.data?.source !== "meeting-proxy-audio-bridge" || event.data.type !== "state") return;
+
+      this.enabled = event.data.enabled === true;
+      this.mode = event.data.mode === "tts" ? "tts" : "microphone";
+      updateAudioMixerUI();
+      if (event.data.requestId) {
+        const pending = this.pendingRequests.get(event.data.requestId);
+        if (pending) {
+          clearTimeout(pending.timeout);
+          this.pendingRequests.delete(event.data.requestId);
+          if (event.data.error) pending.reject(new Error(event.data.error));
+          else pending.resolve(event.data);
+        }
+      }
+      if (event.data.error) {
+        setStatus(`Meet audio bridge error. ${event.data.error}`, "error");
+      } else if (this.enabled && event.data.senderCount === 0) {
+        setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
+      } else if (this.enabled) {
+        setStatus(this.mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
+      }
+    });
+  }
+
+  get isActive() {
+    return this.enabled;
+  }
+
+  request(type, payload = {}, transfer = []) {
+    const requestId = `voice-${Date.now()}-${++this.requestSequence}`;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error("Meet did not respond to the audio bridge. Reload the Meet tab and reopen the panel."));
+      }, 5000);
+      this.pendingRequests.set(requestId, { resolve, reject, timeout });
+      window.parent.postMessage({
+        source: "meeting-proxy-extension",
+        type,
+        requestId,
+        ...payload,
+      }, "https://meet.google.com", transfer);
+    });
+  }
+
+  async start() {
+    return this.request("enable");
+  }
+
+  async stop() {
+    if (!this.enabled) return;
+    return this.request("disable");
+  }
+
+  async setMode(mode) {
+    return this.request("mode", { mode });
+  }
+
+  async speak(text) {
+    if (!this.enabled) throw new Error("Enable the microphone mix first.");
+    if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
+
+    const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
+      backendUrl: "http://127.0.0.1:8000",
+    });
+    const response = await fetch(`${backendUrl.replace(/\/$/, "")}/generate-tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `TTS request failed (${response.status}).`);
+    }
+
+    const audio = await response.arrayBuffer();
+    return this.request("speak", { audio }, [audio]);
+  }
+}
+
+const audioMixer = new AudioMixer();
+
+function updateAudioMixerUI() {
+  const active = audioMixer.isActive;
+  const ttsSelected = active && audioMixer.mode === "tts";
+  $("toggleAudioMixer").textContent = active ? "Disable microphone mix" : "Enable microphone mix";
+  $("toggleAudioMixer").setAttribute("aria-pressed", String(active));
+  $("sourceMode").checked = audioMixer.mode === "tts";
+  $("sourceMode").setAttribute("aria-checked", String(audioMixer.mode === "tts"));
+  $("sourceMode").disabled = !active;
+  $("sourceSwitch").dataset.mode = audioMixer.mode;
+  $("speechText").disabled = !ttsSelected;
+  $("speak").disabled = !ttsSelected;
+}
+
+const viewTabs = Array.from(document.querySelectorAll('[role="tab"]'));
+
+function selectViewTab(tab, focus = false) {
+  for (const viewTab of viewTabs) {
+    const selected = viewTab === tab;
+    viewTab.setAttribute("aria-selected", String(selected));
+    viewTab.tabIndex = selected ? 0 : -1;
+    $(viewTab.getAttribute("aria-controls")).hidden = !selected;
+  }
+  if (focus) tab.focus();
+}
+
+function handleViewTabKeydown(event) {
+  const currentIndex = viewTabs.indexOf(event.currentTarget);
+  let nextIndex = currentIndex;
+
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % viewTabs.length;
+  else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + viewTabs.length) % viewTabs.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = viewTabs.length - 1;
+  else return;
+
+  event.preventDefault();
+  selectViewTab(viewTabs[nextIndex], true);
+}
+
+async function toggleAudioMixer() {
+  const button = $("toggleAudioMixer");
+  button.disabled = true;
+  try {
+    if (audioMixer.isActive) {
+      await audioMixer.stop();
+      setStatus("Microphone mix disabled.");
+    } else {
+      setStatus("Connecting to the Meet microphone sender…");
+      const state = await audioMixer.start();
+      audioMixer.mode = state.mode === "tts" ? "tts" : "microphone";
+      if (state.senderCount > 0) setStatus("Microphone selected for Meet.", "success");
+      else setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
+    }
+  } catch (error) {
+    setStatus(`Could not start the microphone mix. ${error.message}`, "error");
+  } finally {
+    button.disabled = false;
+    updateAudioMixerUI();
+  }
+}
+
+async function changeAudioMode(event) {
+  const toggle = event.currentTarget;
+  const mode = toggle.checked ? "tts" : "microphone";
+  toggle.disabled = true;
+  try {
+    const state = await audioMixer.setMode(mode);
+    audioMixer.mode = state.mode;
+    setStatus(mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
+  } catch (error) {
+    toggle.checked = audioMixer.mode === "tts";
+    setStatus(`Could not switch the audio source. ${error.message}`, "error");
+  } finally {
+    updateAudioMixerUI();
+  }
+}
+
+async function speakText() {
+  const text = $("speechText").value.trim();
+  if (!text) {
+    setStatus("Enter text to speak.", "error");
+    return;
+  }
+
+  const button = $("speak");
+  button.disabled = true;
+  button.textContent = "Generating…";
+  setStatus("Generating speech…");
+  try {
+    await audioMixer.speak(text);
+    setStatus("TTS audio sent to Meet.", "success");
+  } catch (error) {
+    setStatus(`Could not generate speech. ${error.message}`, "error");
+  } finally {
+    button.textContent = "Speak";
+    button.disabled = !audioMixer.isActive;
+  }
+}
+
 function setStatus(message = "", kind = "info") {
   const status = $("status");
   status.textContent = message;
@@ -371,6 +560,8 @@ async function endMeeting() {
   try {
     const response = await sendMessage({ type: "end-meeting" });
     if (response?.ok === false) throw new Error(response.error || "The meeting could not be ended.");
+    await audioMixer.stop();
+    updateAudioMixerUI();
     currentMeetingId = null;
     isMeetingActive = false;
     meetingHasEnded = true;
@@ -490,6 +681,18 @@ $("start").addEventListener("click", startMeeting);
 $("end").addEventListener("click", endMeeting);
 $("returnToLive").addEventListener("click", restoreLiveView);
 historySelect.addEventListener("change", (event) => openSavedMeeting(event.target.value));
+for (const tab of viewTabs) {
+  tab.addEventListener("click", () => selectViewTab(tab));
+  tab.addEventListener("keydown", handleViewTabKeydown);
+}
+$("toggleAudioMixer").addEventListener("click", toggleAudioMixer);
+$("speak").addEventListener("click", speakText);
+$("sourceMode").addEventListener("change", changeAudioMode);
+window.addEventListener("beforeunload", () => {
+  window.parent.postMessage({ source: "meeting-proxy-extension", type: "disable" }, "https://meet.google.com");
+});
+
+updateAudioMixerUI();
 
 async function initialize() {
   if (!hasExtensionRuntime) {

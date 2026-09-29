@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -22,6 +22,8 @@ from .models import (
     MeetingState,
 )
 from .state_engine import MeetingStateEngine
+
+from .basictts import robotic_tts
 
 app = FastAPI(title="Meeting Proxy")
 
@@ -326,6 +328,21 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
     except WebSocketDisconnect:
         return
+
+
+# -------------------------------------------------
+# GENERATING TTS ENDPOINTS
+# -------------------------------------------------
+
+@app.post("/generate-tts")
+async def generate_tts(payload: dict):
+    text = payload.get('text', "")
+    if not text: 
+        return Response(content = "No text Provided", status_code = 400)
+
+    audio = await run_in_threadpool(robotic_tts, text)
+    return Response(content=audio, media_type="audio/wav")
+
 
 
 # --------------------------------------------------

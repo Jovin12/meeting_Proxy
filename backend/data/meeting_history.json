@@ -383,5 +383,180 @@
         }
       ]
     }
+  },
+  {
+    "meeting_id": "74c3b56c-e04f-47d8-8f1d-a0b399d56510",
+    "started_at": "2026-09-24T20:31:06.096647+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "74c3b56c-e04f-47d8-8f1d-a0b399d56510",
+      "active": true,
+      "transcript": [],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "5081b75a-a784-462b-9e5b-343abcb586f6",
+    "started_at": "2026-09-24T21:00:03.556490+00:00",
+    "ended_at": "2026-09-24T21:02:28.830647+00:00",
+    "state": {
+      "meeting_id": "5081b75a-a784-462b-9e5b-343abcb586f6",
+      "active": false,
+      "transcript": [
+        {
+          "timestamp": "06:08",
+          "speaker": "You",
+          "text": "On captions, right? Yeah, so now, captions are on. I can go to inspect element. Uh, console, and then you can see so, yeah, and then you can see as I'm speaking on the captions. It's going to give you the output, so what? Uh, the? An entire thing is doing is right now. It's going to this captions that the Google meets is giving out, and then it's going to. I will use that caption to talk to the backend and update, uh, all the. Uh, you know, update the data files, which is the notes, the meetings, the transcript, and things like that, uh, right now. It's just, uh, temporary, but then. Uh, you will see in the extension. When I open the extension and? First transcripts. Waiting for captions, making sure captions are okay. It's supposed to update this part. Yeah, it's supposed to update that. I don't know why I didn't update it, but now, if I go something like greeting and then do save notes. Oh, oh, that's fine. Okay, it's connected to the wrong meeting. Yeah."
+        },
+        {
+          "timestamp": "06:11",
+          "speaker": "You",
+          "text": "On captions, right? Yeah, so now, captions are on. I can go to inspect element. Uh, console, and then you can see so, yeah, and then you can see as I'm speaking on the captions. It's going to give you the output, so what? Uh, the? An entire thing is doing is right now. It's going to this captions that the Google meets is giving out, and then it's going to. I will use that caption to talk to the backend and update, uh, all the. Uh, you know, update the data files, which is the notes, the meetings, the transcript, and things like that, uh, right now. It's just, uh, temporary, but then. Uh, you will see in the extension. When I open the extension and? First transcripts. Waiting for captions, making sure captions are okay. It's supposed to update this part. Yeah, it's supposed to update that. I don't know why I didn't update it, but now, if I go something like greeting and then do save notes. Oh, oh, that's fine. Okay, it's connected to the wrong meeting. Yeah. So, now if I speak?"
+        },
+        {
+          "timestamp": "06:13",
+          "speaker": "You",
+          "text": "On captions, right? Yeah, so now, captions are on. I can go to inspect element. Uh, console, and then you can see so, yeah, and then you can see as I'm speaking on the captions. It's going to give you the output, so what? Uh, the? An entire thing is doing is right now. It's going to this captions that the Google meets is giving out, and then it's going to. I will use that caption to talk to the backend and update, uh, all the. Uh, you know, update the data files, which is the notes, the meetings, the transcript, and things like that, uh, right now. It's just, uh, temporary, but then. Uh, you will see in the extension. When I open the extension and? First transcripts. Waiting for captions, making sure captions are okay. It's supposed to update this part. Yeah, it's supposed to update that. I don't know why I didn't update it, but now, if I go something like greeting and then do save notes. Oh, oh, that's fine. Okay, it's connected to the wrong meeting. Yeah. So, now if I speak, it may work, may not work, I don't know."
+        },
+        {
+          "timestamp": "06:15",
+          "speaker": "Richard Watson S A",
+          "text": "No, no, no, no, that's right here."
+        },
+        {
+          "timestamp": "06:19",
+          "speaker": "You",
+          "text": "Yeah, so now you can see, I added greeting. As a note, it appears over here."
+        },
+        {
+          "timestamp": "06:39",
+          "speaker": "You",
+          "text": "Yeah, so now you can see, I added greeting. As a note, it appears over here. Uh, and I, it takes a few seconds. It takes about 3 to 5 seconds for. Oh yeah, so right here, you see, the meeting notes, members greeting, and the transcript discussion. Now, water related but not directly addressed, uh, so it goes through the transcript. And then, here, you can see the transcript is updated."
+        },
+        {
+          "timestamp": "06:40",
+          "speaker": "Richard Watson S A",
+          "text": "Yeah, yeah, I do see it. So, yeah, that's fine."
+        },
+        {
+          "timestamp": "06:55",
+          "speaker": "You",
+          "text": "Yeah, so this is, uh, and then I have a log of, like all the previous notes, and uh, like, what, uh, notes you made from previously. So, in case the previous meeting, you had specific notes, uh, and then, uh."
+        },
+        {
+          "timestamp": "07:12",
+          "speaker": "You",
+          "text": "Yeah, so this is, uh, and then I have a log of, like all the previous notes, and uh, like, what, uh, notes you made from previously. So, in case the previous meeting, you had specific notes, uh, and then, uh. In the following meeting, you want to continue using those notes. You can just copy and paste it, or like, you can go back to the previous meeting, so that is why this is here. So, other than that, this one has a live transcript. I want to change this to summary instead of transcript because this is just too much information."
+        },
+        {
+          "timestamp": "07:30",
+          "speaker": "You",
+          "text": "Yeah, so this is, uh, and then I have a log of, like all the previous notes, and uh, like, what, uh, notes you made from previously. So, in case the previous meeting, you had specific notes, uh, and then, uh. In the following meeting, you want to continue using those notes. You can just copy and paste it, or like, you can go back to the previous meeting, so that is why this is here. So, other than that, this one has a live transcript. I want to change this to summary instead of transcript because this is just too much information. Uh, so I was thinking of changing this to summary, but I'll figure it out later. And then, uh, here you can edit notes, you can. You can also remove this if you remove this and do save notes. It removes that from the meeting notes, uh, area, so you can do something like this side on, uh, database."
+        },
+        {
+          "timestamp": "07:33",
+          "speaker": "You",
+          "text": "Yeah, so this is, uh, and then I have a log of, like all the previous notes, and uh, like, what, uh, notes you made from previously. So, in case the previous meeting, you had specific notes, uh, and then, uh. In the following meeting, you want to continue using those notes. You can just copy and paste it, or like, you can go back to the previous meeting, so that is why this is here. So, other than that, this one has a live transcript. I want to change this to summary instead of transcript because this is just too much information. Uh, so I was thinking of changing this to summary, but I'll figure it out later. And then, uh, here you can edit notes, you can. You can also remove this if you remove this and do save notes. It removes that from the meeting notes, uh, area, so you can do something like this side on a database. And then save notes and then."
+        },
+        {
+          "timestamp": "07:33",
+          "speaker": "Richard Watson S A",
+          "text": "Yeah, I don't see it. Yeah."
+        },
+        {
+          "timestamp": "07:48",
+          "speaker": "You",
+          "text": "Yeah, so every time notes gets updated, or every time this transcript or a timestamp in the transcript gets updated, it's going to go through the llm, analyze it, and come and tell you whether it was. Done or not, and then it gives you a confidence level on whether it was."
+        },
+        {
+          "timestamp": "07:53",
+          "speaker": "You",
+          "text": "Yeah, so every time notes gets updated, or every time this transcript or a timestamp in the transcript gets updated, it's going to go through the llm, analyze it, and come and tell you whether it was. Done or not, and then it gives you a confidence level on whether it was partly discussed completely discussed or not discussed at all."
+        },
+        {
+          "timestamp": "08:08",
+          "speaker": "You",
+          "text": "Yeah, so every time notes gets updated, or every time this transcript or a timestamp in the transcript gets updated, it's going to go through the llm, analyze it, and come and tell you whether it was. Done or not, and then it gives you a confidence level on whether it was partly discussed completely discussed or not discussed at all. Right, so that is essentially what this UR is doing so. Now, this is just a simple, uh, what do you say assistant? It's similar to how Gemini does right. It just takes the notes of the meeting, and then, uh, that's about it, right?"
+        },
+        {
+          "timestamp": "08:11",
+          "speaker": "You",
+          "text": "Yeah, so every time notes gets updated, or every time this transcript or a timestamp in the transcript gets updated, it's going to go through the llm, analyze it, and come and tell you whether it was. Done or not, and then it gives you a confidence level on whether it was partly discussed completely discussed or not discussed at all. Right, so that is essentially what this UR is doing so. Now, this is just a simple, uh, what do you say assistant? It's similar to how Gemini does right. It just takes the notes of the meeting, and then, uh, that's about it, right? Uh, what we are looking to do is?"
+        }
+      ],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on database",
+          "status": "partial",
+          "evidence": "The meeting note 'Decide on database' is partially addressed in the transcript, as the discussion about notes and log seems to be related to the topic of deciding on a database. However, there is no clear outcome or decision made regarding the database.",
+          "confidence": 0.6,
+          "timestamp": "07:12"
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "fc3cb101-13bf-458d-b484-3a4e1fcd6bfb",
+    "started_at": "2026-09-29T15:02:46.213269+00:00",
+    "ended_at": "2026-09-29T15:03:02.316746+00:00",
+    "state": {
+      "meeting_id": "fc3cb101-13bf-458d-b484-3a4e1fcd6bfb",
+      "active": false,
+      "transcript": [
+        {
+          "timestamp": "01:38",
+          "speaker": "You",
+          "text": "Hello."
+        }
+      ],
+      "notes": [
+        {
+          "id": 0,
+          "text": "Decide on database",
+          "status": "open",
+          "evidence": "The meeting note was not directly discussed.",
+          "confidence": 0.0,
+          "timestamp": null
+        }
+      ]
+    }
+  },
+  {
+    "meeting_id": "12032efd-b000-4962-9f97-81d41b413d0b",
+    "started_at": "2026-09-29T15:29:40.165475+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "12032efd-b000-4962-9f97-81d41b413d0b",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:36",
+          "speaker": "You",
+          "text": "Bring down. Or maybe I'm the same activity?"
+        },
+        {
+          "timestamp": "00:38",
+          "speaker": "You",
+          "text": "When we have the same activity."
+        },
+        {
+          "timestamp": "00:41",
+          "speaker": "You",
+          "text": "When we have the same activity. I am."
+        },
+        {
+          "timestamp": "00:45",
+          "speaker": "You",
+          "text": "When we have the same activity. I am. And."
+        },
+        {
+          "timestamp": "00:48",
+          "speaker": "You",
+          "text": "When we have the same activity. I am. And. And move."
+        }
+      ],
+      "notes": []
+    }
   }
 ]
