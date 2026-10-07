@@ -443,6 +443,56 @@
       border-top: 1px solid var(--line);
     }
 
+    .conversation-section {
+      margin-top: 24px;
+      padding-top: 19px;
+      border-top: 1px solid var(--line);
+    }
+
+    .conversation-log {
+      display: grid;
+      gap: 8px;
+      max-height: 190px;
+      min-height: 52px;
+      overflow-y: auto;
+      padding: 4px 0 10px;
+      border-bottom: 1px solid var(--line-soft);
+      scrollbar-color: var(--line) var(--page);
+      scrollbar-width: thin;
+    }
+
+    .conversation-turn {
+      margin: 0;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .conversation-turn[data-role="user"] {
+      color: var(--ice);
+    }
+
+    .conversation-turn[data-interrupted="true"] {
+      opacity: 0.62;
+    }
+
+    .conversation-controls {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .conversation-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .conversation-actions .button-primary {
+      flex: 1;
+    }
+
     .questions-section {
       margin-top: 24px;
       padding-top: 19px;
@@ -964,6 +1014,24 @@
     </section>
 
     <section class="tab-panel" id="userProxyPanel" role="tabpanel" aria-labelledby="userProxyTab" hidden>
+      <section class="conversation-section" aria-labelledby="conversationHeading">
+        <header class="section-heading">
+          <div>
+            <h2 class="section-title" id="conversationHeading">Conversation</h2>
+            <p class="notes-description" id="conversationTopic">Waiting for transcript updates</p>
+          </div>
+        </header>
+        <div class="conversation-log" id="conversationLog" role="log" aria-live="polite" aria-label="Conversation with proxy">
+          <p class="empty-state">The proxy observes the meeting and suggests replies here. Nothing is spoken unless you approve it.</p>
+        </div>
+        <div class="conversation-controls">
+          <div class="conversation-actions">
+            <button class="button button-secondary" id="conversationInterrupt" type="button" disabled>Interrupt</button>
+            <button class="button button-primary" id="conversationSpeak" type="button" disabled>Speak response</button>
+          </div>
+          <p class="notes-description">Speaking requires the audio mixer enabled and TTS selected.</p>
+        </div>
+      </section>
       <section class="questions-section" aria-labelledby="questionsHeading">
         <header class="section-heading">
           <div>

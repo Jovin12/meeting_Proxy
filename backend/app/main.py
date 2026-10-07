@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,7 @@ from .models import (
     SuggestedQuestions,
 )
 from .state_engine import MeetingStateEngine
+from .duplex_llm import ConversationalBot
 
 from .basictts import robotic_tts
 
@@ -40,6 +42,7 @@ app.add_middleware(
 retriever = TranscriptRetriever()
 
 meeting_engines: dict[str, MeetingStateEngine] = {}
+conversational_engines: dict[str, ConversationalBot] = {}
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 HISTORY_PATH = DATA_DIR / "meeting_history.json"
 
@@ -94,6 +97,12 @@ def _latest_engine() -> MeetingStateEngine:
         )
     meeting_id = next(reversed(meeting_engines))
     return meeting_engines[meeting_id]
+
+
+async def _interrupt_conversation(meeting_id: str) -> None:
+    conversational_engine = conversational_engines.get(meeting_id)
+    if conversational_engine is not None:
+        await conversational_engine.interrupt()
 
 
 # --------------------------------------------------
@@ -153,6 +162,7 @@ def start_meeting(request: MeetingStartRequest | None = None):
         notes=notes,
         retriever=TranscriptRetriever(),
     )
+    conversational_engines[meeting_id] = ConversationalBot()
 
     state = meeting_engines[meeting_id].get_state()
     meeting_history.append({
@@ -213,7 +223,9 @@ def add_meeting_event_flat(event: TranscriptEvent):
     engine = _latest_engine()
     if not engine.state.active:
         raise HTTPException(400, "Meeting has already ended.")
-    return engine.add_event(event)
+    state = engine.add_event(event)
+    conversational_engines[state.meeting_id].update_transcript(state.transcript)
+    return state
 
 
 @app.get("/meeting/state")
@@ -222,8 +234,10 @@ def get_meeting_state_flat():
 
 
 @app.post("/meeting/end")
-def end_meeting_flat():
-    state = _latest_engine().end_meeting()
+async def end_meeting_flat():
+    engine = _latest_engine()
+    await _interrupt_conversation(engine.state.meeting_id)
+    state = engine.end_meeting()
     _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
     return state
 
@@ -237,7 +251,9 @@ def add_meeting_event(meeting_id: str, event: TranscriptEvent):
     engine = _get_engine(meeting_id)
     if not engine.state.active:
         raise HTTPException(400, "Meeting has already ended.")
-    return engine.add_event(event)
+    state = engine.add_event(event)
+    conversational_engines[meeting_id].update_transcript(state.transcript)
+    return state
 
 
 @app.post("/meeting/{meeting_id}/notes")
@@ -283,17 +299,20 @@ async def get_suggested_questions(meeting_id: str):
 
 
 @app.post("/meeting/{meeting_id}/end")
-def end_meeting(meeting_id: str):
+async def end_meeting(meeting_id: str):
+    await _interrupt_conversation(meeting_id)
     state = _get_engine(meeting_id).end_meeting()
     _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
     return state
 
 
 @app.delete("/meeting/{meeting_id}")
-def delete_meeting(meeting_id: str):
+async def delete_meeting(meeting_id: str):
     if meeting_id not in meeting_engines:
         raise HTTPException(404, f"No meeting found with id {meeting_id}.")
+    await _interrupt_conversation(meeting_id)
     del meeting_engines[meeting_id]
+    conversational_engines.pop(meeting_id, None)
     return {"deleted": meeting_id}
 
 
@@ -311,8 +330,26 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
         await websocket.close()
         return
 
+    conversational_engine = conversational_engines.get(meeting_id)
+    if conversational_engine is None:
+        conversational_engine = ConversationalBot()
+        conversational_engines[meeting_id] = conversational_engine
+    conversational_engine.update_transcript(engine.state.transcript)
+
+    send_lock = asyncio.Lock()
+
+    async def send_payload(payload: dict) -> None:
+        async with send_lock:
+            await websocket.send_json(payload)
+
+    async def send_conversation_event(payload: dict) -> None:
+        try:
+            await send_payload(payload)
+        except (RuntimeError, WebSocketDisconnect):
+            return
+
     # 1. Push current state immediately so the client renders without a round trip.
-    await websocket.send_json(engine.get_state().model_dump(mode="json"))
+    await send_payload(engine.get_state().model_dump(mode="json"))
 
     try:
         while True:
@@ -331,20 +368,26 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
                 # add_event does embeddings + LLM call — keep the loop unblocked.
                 state = await run_in_threadpool(engine.add_event, event)
+                conversational_engine.update_transcript(state.transcript)
                 _save_meeting_state(state)
 
-                await websocket.send_json(state.model_dump(mode="json"))
+                await send_payload(state.model_dump(mode="json"))
+                await conversational_engine.observe_transcript(send_conversation_event)
+
+            elif msg_type == "conversation_interrupt":
+                await conversational_engine.interrupt(send_conversation_event)
 
             elif msg_type == "ping":
-                await websocket.send_json({"type": "pong"})
+                await send_payload({"type": "pong"})
 
             else:
-                await websocket.send_json({
+                await send_payload({
                     "type": "error",
                     "detail": f"Unknown message type: {msg_type}",
                 })
 
     except WebSocketDisconnect:
+        await conversational_engine.interrupt()
         return
 
 

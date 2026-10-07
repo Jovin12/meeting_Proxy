@@ -59,3 +59,10 @@ class MeetingState(BaseModel):
     active: bool = True
     transcript: list[TranscriptEvent] = []
     notes: list[Note] = []
+
+
+class ConversationalState(BaseModel):
+    transcript: list[TranscriptEvent] = Field(default_factory=list)
+    current_topic: str = ""
+    recent_messages: list[dict[str, str]] = Field(default_factory=list)
+    last_bot_response: str = ""

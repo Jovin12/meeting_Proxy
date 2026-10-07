@@ -121,6 +121,11 @@ async function openSocket(id) {
 
     if (msg.type === "pong") return;
 
+    if (msg.type?.startsWith("conversation_")) {
+      broadcastToSidePanel({ type: "conversation", event: msg });
+      return;
+    }
+
     if (msg.error) {
       console.error("[bg] backend error", msg.error);
       broadcastToSidePanel({ type: "error", detail: msg.error });
@@ -297,6 +302,14 @@ async function handleMessage(msg, sender) {
           text: msg.text,
         })
       );
+      return { ok: true };
+    }
+
+    case "conversation-interrupt": {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return { ok: false, error: "meeting socket is not connected" };
+      }
+      ws.send(JSON.stringify({ type: "conversation_interrupt" }));
       return { ok: true };
     }
 

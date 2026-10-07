@@ -24,6 +24,10 @@ let questionRequestSequence = 0;
 let lastQuestionTranscriptCount = 0;
 let questionRefreshTimer = null;
 let questionsLoading = false;
+let conversationBusy = false;
+let activeConversationRequestId = null;
+let conversationAssistantNode = null;
+let lastConversationResponse = "";
 
 async function getBackendUrl() {
   const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
@@ -36,6 +40,7 @@ class AudioMixer {
   constructor() {
     this.enabled = false;
     this.mode = "microphone";
+    this.isSpeaking = false;
     this.pendingRequests = new Map();
     this.requestSequence = 0;
     window.addEventListener("message", (event) => {
@@ -44,6 +49,7 @@ class AudioMixer {
 
       this.enabled = event.data.enabled === true;
       this.mode = event.data.mode === "tts" ? "tts" : "microphone";
+      this.isSpeaking = event.data.speaking === true;
       updateAudioMixerUI();
       if (event.data.requestId) {
         const pending = this.pendingRequests.get(event.data.requestId);
@@ -113,7 +119,18 @@ class AudioMixer {
     }
 
     const audio = await response.arrayBuffer();
+    return this.playAudio(audio);
+  }
+
+  async playAudio(audio) {
+    if (!this.enabled) throw new Error("Enable the microphone mix first.");
+    if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
     return this.request("speak", { audio }, [audio]);
+  }
+
+  async stopSpeech() {
+    if (!this.enabled || !this.isSpeaking) return;
+    return this.request("stop");
   }
 }
 
@@ -130,6 +147,8 @@ function updateAudioMixerUI() {
   $("sourceSwitch").dataset.mode = audioMixer.mode;
   $("speechText").disabled = !ttsSelected;
   $("speak").disabled = !ttsSelected;
+  $("conversationInterrupt").disabled = !conversationBusy && !audioMixer.isSpeaking;
+  $("conversationSpeak").disabled = !lastConversationResponse || !ttsSelected || !isMeetingActive || isReviewingHistory;
   $("refreshQuestions").disabled = questionsLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
   $("questionsList").disabled = questionsLoading || !suggestedQuestions.length || !isMeetingActive || isReviewingHistory;
 }
@@ -220,6 +239,130 @@ async function speakText() {
   } finally {
     button.textContent = "Speak";
     button.disabled = !audioMixer.isActive;
+  }
+}
+
+function appendConversationTurn(role, text) {
+  $("conversationLog").querySelector(".empty-state")?.remove();
+  const turn = createTextElement("p", "conversation-turn", text);
+  turn.dataset.role = role;
+  $("conversationLog").appendChild(turn);
+  while ($("conversationLog").children.length > 24) {
+    $("conversationLog").firstElementChild.remove();
+  }
+  $("conversationLog").scrollTop = $("conversationLog").scrollHeight;
+  return turn;
+}
+
+async function speakConversationResponse() {
+  if (!lastConversationResponse || !isMeetingActive || isReviewingHistory) return;
+  const button = $("conversationSpeak");
+  button.disabled = true;
+  button.textContent = "Generating speech…";
+  try {
+    if (audioMixer.isSpeaking) await audioMixer.stopSpeech();
+    await audioMixer.speak(lastConversationResponse);
+    setStatus("Approved response sent to Meet.", "success");
+  } catch (error) {
+    setStatus(`Could not speak the approved response. ${error.message}`, "error");
+  } finally {
+    button.textContent = "Speak response";
+    updateAudioMixerUI();
+  }
+}
+
+async function interruptConversation() {
+  const requestId = activeConversationRequestId;
+  const wasGenerating = conversationBusy;
+  if (audioMixer.isSpeaking) {
+    try {
+      await audioMixer.stopSpeech();
+    } catch (error) {
+      setStatus(`Could not stop speech. ${error.message}`, "error");
+    }
+  }
+
+  if (conversationBusy) {
+    try {
+      const response = await sendMessage({ type: "conversation-interrupt", requestId });
+      if (!response?.ok) throw new Error(response?.error || "The proxy could not be interrupted.");
+    } catch (error) {
+      setStatus(`Could not interrupt the proxy. ${error.message}`, "error");
+    }
+  }
+
+  if (conversationAssistantNode && conversationBusy) {
+    conversationAssistantNode.dataset.interrupted = "true";
+    if (!conversationAssistantNode.textContent.trim()) {
+      conversationAssistantNode.textContent = "Interrupted.";
+    }
+  }
+  conversationBusy = false;
+  activeConversationRequestId = null;
+  updateAudioMixerUI();
+  if (wasGenerating) {
+    setStatus("Transcript response generation interrupted.");
+  } else if (audioMixer.isSpeaking === false) {
+    setStatus("Speech stopped.");
+  }
+}
+
+function handleConversationEvent(event) {
+  if (!event) return;
+  if (event.type === "conversation_interrupted") {
+    if (event.request_id === activeConversationRequestId) {
+      conversationBusy = false;
+      if (conversationAssistantNode) {
+        conversationAssistantNode.dataset.interrupted = "true";
+        if (!conversationAssistantNode.textContent.trim()) {
+          conversationAssistantNode.textContent = "Interrupted.";
+        }
+      }
+      activeConversationRequestId = null;
+      updateAudioMixerUI();
+      setStatus("Transcript response generation interrupted.");
+    }
+    return;
+  }
+
+  if (event.type === "conversation_started") {
+    activeConversationRequestId = event.request_id;
+    conversationBusy = true;
+    lastConversationResponse = "";
+    conversationAssistantNode = appendConversationTurn("assistant", "Reviewing the latest transcript…");
+    $("conversationTopic").textContent = event.current_topic
+      ? `Current topic: ${event.current_topic}`
+      : "No meeting transcript yet";
+    updateAudioMixerUI();
+    setStatus("Reviewing the latest transcript…");
+    return;
+  }
+  if (event.request_id !== activeConversationRequestId) return;
+
+  if (event.type === "conversation_no_response") {
+    if (conversationAssistantNode) {
+      conversationAssistantNode.textContent = "No response is needed for this part of the conversation.";
+    }
+    conversationBusy = false;
+    activeConversationRequestId = null;
+    updateAudioMixerUI();
+    setStatus("No response needed.", "success");
+  } else if (event.type === "conversation_complete") {
+    lastConversationResponse = event.response || "";
+    if (conversationAssistantNode) conversationAssistantNode.textContent = lastConversationResponse;
+    if (event.current_topic) $("conversationTopic").textContent = `Current topic: ${event.current_topic}`;
+    conversationBusy = false;
+    activeConversationRequestId = null;
+    updateAudioMixerUI();
+    setStatus("Response ready for your approval. It will not be spoken unless you select Speak response.");
+  } else if (event.type === "conversation_error") {
+    conversationBusy = false;
+    activeConversationRequestId = null;
+    if (conversationAssistantNode) {
+      conversationAssistantNode.textContent = `Proxy error: ${event.detail || "unknown error"}`;
+    }
+    updateAudioMixerUI();
+    setStatus(`Proxy response failed. ${event.detail || "Unknown error."}`, "error");
   }
 }
 
@@ -545,15 +688,36 @@ function applyLiveState(state) {
     selectedQuestionIndex = 0;
     lastQuestionTranscriptCount = 0;
     questionsLoading = false;
+    conversationBusy = false;
+    activeConversationRequestId = null;
+    conversationAssistantNode = null;
+    lastConversationResponse = "";
     renderSuggestedQuestions("Start a meeting to get question suggestions.");
   }
+  const transcriptChanged = Boolean(
+    !isReviewingHistory
+    && state.meeting_id
+    && state.meeting_id === latestLiveState?.meeting_id
+    && JSON.stringify(state.transcript || []) !== JSON.stringify(latestLiveState.transcript || [])
+  );
   latestLiveState = state;
   if (state.meeting_id) currentMeetingId = state.meeting_id;
+  const latestTranscriptEvent = state.transcript?.at(-1);
+  if (latestTranscriptEvent?.text && !isReviewingHistory) {
+    $("conversationTopic").textContent = `Current topic: ${latestTranscriptEvent.text.slice(0, 240)}`;
+  }
   isMeetingActive = state.active === true || (state.active === undefined && Boolean(currentMeetingId));
   meetingHasEnded = state.active === false;
   if (!isReviewingHistory) {
     renderMeetingState(state);
     updateSessionUI();
+  }
+  if (transcriptChanged) {
+    lastConversationResponse = "";
+    if (conversationAssistantNode) {
+      conversationAssistantNode.dataset.interrupted = "true";
+      conversationAssistantNode.textContent = "New transcript received; checking whether a response is needed.";
+    }
   }
   updateAudioMixerUI();
   if ($("userProxyTab").getAttribute("aria-selected") === "true") {
@@ -741,10 +905,15 @@ function onRuntimeMessage(message) {
     setConnection(message.open);
   } else if (message.type === "error") {
     setStatus(message.detail || "The local service reported an error.", "error");
+  } else if (message.type === "conversation") {
+    handleConversationEvent(message.event);
   } else if (message.type === "ended") {
     currentMeetingId = null;
     isMeetingActive = false;
     meetingHasEnded = true;
+    conversationBusy = false;
+    activeConversationRequestId = null;
+    lastConversationResponse = "";
     if (latestLiveState) {
       latestLiveState = { ...latestLiveState, active: false };
       if (!isReviewingHistory) renderMeetingState(latestLiveState);
@@ -792,6 +961,8 @@ for (const tab of viewTabs) {
 }
 $("toggleAudioMixer").addEventListener("click", toggleAudioMixer);
 $("speak").addEventListener("click", speakText);
+$("conversationInterrupt").addEventListener("click", interruptConversation);
+$("conversationSpeak").addEventListener("click", speakConversationResponse);
 $("sourceMode").addEventListener("change", changeAudioMode);
 $("refreshQuestions").addEventListener("click", () => scheduleQuestionSuggestions(true));
 $("questionsList").addEventListener("change", (event) => {

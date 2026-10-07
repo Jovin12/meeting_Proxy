@@ -97,6 +97,19 @@
     font-size: 0.75rem;
     color: #888;
   }
+  .conversation-log {
+    min-height: 4rem;
+    max-height: 15rem;
+    overflow: auto;
+    padding: 0.75rem;
+    border: 1px solid #4444;
+    border-radius: 6px;
+    white-space: pre-wrap;
+  }
+  .conversation-turn { margin: 0 0 0.75rem; }
+  .conversation-turn:last-child { margin-bottom: 0; }
+  .conversation-turn[data-role="user"] { color: #20b9a0; }
+  .conversation-turn[data-interrupted="true"] { opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -128,6 +141,19 @@
   <p class="status" id="status"></p>
 </section>
 
+<section>
+  <h2>Conversational proxy</h2>
+  <p>The proxy observes transcript events and proposes a reply when one is needed. Replies are never spoken without approval.</p>
+  <div id="conversation-log" class="conversation-log" role="log" aria-live="polite">Waiting for transcript updates.</div>
+  <div class="row">
+    <button id="speak-proxy" disabled>Preview approved response</button>
+    <button id="interrupt-proxy" disabled>Interrupt</button>
+    <button id="send-demo" disabled>Load demo transcript</button>
+  </div>
+  <p class="status" id="conversation-status"></p>
+  <audio id="proxy-audio" controls hidden></audio>
+</section>
+
 <section class="cols">
   <div>
     <div class="panel-head">
@@ -150,10 +176,14 @@
   let meetingId = null;
   let startedAt = null;
   let elapsedTimer = null;
+  let conversationRequestId = null;
+  let assistantTurn = null;
+  let lastConversationResponse = "";
 
   const $ = (id) => document.getElementById(id);
 
   const setStatus = (msg) => { $("status").textContent = msg; };
+  const setConversationStatus = (msg) => { $("conversation-status").textContent = msg; };
 
   const setWsState = (open) => {
     const el = $("ws-state");
@@ -227,6 +257,7 @@
       $("send").disabled = false;
       $("send-quick").disabled = false;
       $("refresh").disabled = false;
+      $("send-demo").disabled = false;
       setStatus("connected");
     };
 
@@ -234,6 +265,9 @@
       setWsState(false);
       $("send").disabled = true;
       $("send-quick").disabled = true;
+      $("speak-proxy").disabled = true;
+      $("interrupt-proxy").disabled = true;
+      $("send-demo").disabled = true;
       // keep refresh enabled if we have a meeting id, so you can still poll
       $("refresh").disabled = !meetingId;
     };
@@ -254,6 +288,10 @@
         setStatus(`error: ${msg.detail}`);
         return;
       }
+      if (msg.type?.startsWith("conversation_")) {
+        handleConversationEvent(msg);
+        return;
+      }
       // Otherwise it's a MeetingState
       applyState(msg, "ws");
       setStatus("state updated");
@@ -271,6 +309,96 @@
     ws.send(JSON.stringify(payload));
     setStatus(`sent @ ${payload.timestamp}`);
   };
+
+  const DEMO_TRANSCRIPT = [
+    { speaker: "Alice", text: "We are aiming to launch the customer dashboard next Friday." },
+    { speaker: "Bob", text: "The date depends on completing the security review." },
+    { speaker: "Carol", text: "I can finish the review by Wednesday, but we still need a rollback owner." },
+  ];
+
+  function addConversationTurn(role, text) {
+    const log = $("conversation-log");
+    if (log.textContent === "Waiting for transcript updates.") log.replaceChildren();
+    const turn = document.createElement("p");
+    turn.className = "conversation-turn";
+    turn.dataset.role = role;
+    turn.textContent = text;
+    log.appendChild(turn);
+    log.scrollTop = log.scrollHeight;
+    return turn;
+  }
+
+  function handleConversationEvent(event) {
+    if (event.type === "conversation_interrupted") {
+      if (event.request_id === conversationRequestId) {
+        if (assistantTurn) assistantTurn.dataset.interrupted = "true";
+        conversationRequestId = null;
+        $("interrupt-proxy").disabled = true;
+        setConversationStatus("Response interrupted.");
+      }
+      return;
+    }
+
+    if (event.type === "conversation_started") {
+      conversationRequestId = event.request_id;
+      lastConversationResponse = "";
+      assistantTurn = addConversationTurn("assistant", "Reviewing the latest transcript…");
+      $("speak-proxy").disabled = true;
+      $("interrupt-proxy").disabled = false;
+      setConversationStatus(event.current_topic
+        ? `Reviewing transcript context: ${event.current_topic}`
+        : "Reviewing transcript context.");
+      return;
+    }
+    if (event.request_id !== conversationRequestId) return;
+
+    if (event.type === "conversation_no_response") {
+      if (assistantTurn) assistantTurn.textContent = "No response is needed for this part of the conversation.";
+      conversationRequestId = null;
+      $("interrupt-proxy").disabled = true;
+      setConversationStatus("No response needed.");
+    } else if (event.type === "conversation_complete") {
+      lastConversationResponse = event.response || "";
+      if (assistantTurn) assistantTurn.textContent = lastConversationResponse;
+      conversationRequestId = null;
+      $("speak-proxy").disabled = !lastConversationResponse;
+      $("interrupt-proxy").disabled = true;
+      setConversationStatus("Response ready for approval. Select Preview approved response to play it locally.");
+    } else if (event.type === "conversation_error") {
+      if (assistantTurn) {
+        assistantTurn.textContent = `Proxy error: ${event.detail || "unknown error"}`;
+      }
+      conversationRequestId = null;
+      $("speak-proxy").disabled = true;
+      $("interrupt-proxy").disabled = true;
+      setConversationStatus(`Proxy error: ${event.detail || "unknown error"}`);
+    }
+  }
+
+  async function speakConversationResponse() {
+    if (!lastConversationResponse) return;
+    const button = $("speak-proxy");
+    button.disabled = true;
+    button.textContent = "Generating preview…";
+    try {
+      const response = await fetch("/generate-tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: lastConversationResponse }),
+      });
+      if (!response.ok) throw new Error(await response.text() || `TTS request failed (${response.status}).`);
+      const audio = $("proxy-audio");
+      audio.src = URL.createObjectURL(await response.blob());
+      audio.hidden = false;
+      await audio.play();
+      setConversationStatus("Approved response preview is playing.");
+    } catch (error) {
+      setConversationStatus(`Could not speak the approved response: ${error.message}`);
+    } finally {
+      button.textContent = "Preview approved response";
+      button.disabled = !lastConversationResponse;
+    }
+  }
 
   $("start").addEventListener("click", async () => {
     setStatus("starting…");
@@ -334,6 +462,20 @@
     const c = CANNED[cannedIndex % CANNED.length];
     cannedIndex++;
     sendEvent(c.speaker, c.text);
+  });
+
+  $("send-demo").addEventListener("click", () => {
+    for (const event of DEMO_TRANSCRIPT) sendEvent(event.speaker, event.text);
+  });
+
+  $("speak-proxy").addEventListener("click", speakConversationResponse);
+  $("interrupt-proxy").addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    $("proxy-audio").pause();
+    $("proxy-audio").currentTime = 0;
+    ws.send(JSON.stringify({ type: "conversation_interrupt" }));
+    $("interrupt-proxy").disabled = true;
+    setConversationStatus("Interrupt sent.");
   });
 
   // Enter inside the textarea sends, Shift+Enter inserts newline.

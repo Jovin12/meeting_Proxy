@@ -29,6 +29,7 @@
       requestId,
       enabled,
       mode,
+      speaking: ttsSources.size > 0,
       senderCount: senderOriginalTracks.size,
       error,
     }, location.origin);
@@ -125,6 +126,7 @@
     source.addEventListener("ended", () => {
       ttsSources.delete(source);
       source.disconnect();
+      publishState();
     }, { once: true });
     source.start();
   }
@@ -207,6 +209,7 @@
       if (message.type === "enable") await enableMix();
       else if (message.type === "disable") await disableMix();
       else if (message.type === "speak") await playTts(message.audio);
+      else if (message.type === "stop") stopTtsSources();
       else if (message.type === "mode") setMode(message.mode);
       else return;
       publishState(message.requestId);
