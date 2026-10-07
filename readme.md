@@ -9,8 +9,10 @@ Google Meet captions and displays the live transcript and note status in a
 custom panel. The panel separates meeting notes from **User Proxy**, which can
 switch Meet's outgoing audio between its selected microphone and generated
 Pocket TTS speech. The User Proxy also generates transcript-grounded question
-suggestions that can be selected and spoken through the same audio path. Ollama
-and semantic retrieval provide evidence for note classification.
+suggestions and observes the live conversation to propose replies. Proposed
+replies are shown for approval; they are sent to Meet only when the user selects
+**Speak response**. Ollama and semantic retrieval provide evidence for note
+classification.
 
 ## High-Level Architecture
 
@@ -20,12 +22,13 @@ The system is organized into four areas:
 
 - **Client interfaces:** the Google Meet browser extension, the legacy React
   frontend, and the static WebSocket smoke-test page.
-- **Backend service:** FastAPI receives transcript events, manages meeting
-  state, and provides the Pocket TTS WAV endpoint.
+- **Backend service:** FastAPI receives transcript events, keeps note analysis
+  separate from conversational state, and provides Pocket TTS audio.
 - **Analysis pipeline:** transcript events are chunked and embedded by
   `TranscriptRetriever`, stored in in-memory ChromaDB, and matched to notes.
 - **External AI service:** local Ollama runs `llama3.2:3b` and returns
-  structured note classifications and suggested meeting questions.
+  structured note classifications, suggested questions, and transcript-driven
+  conversational decisions and reply proposals.
 
 ## What It Does
 
@@ -40,6 +43,10 @@ The system is organized into four areas:
    `completed`, but it never regresses. Completed notes are frozen and skip
    later LLM calls.
 7. The updated meeting state is sent back to the extension panel.
+8. In **User Proxy**, the proxy observes transcript updates, decides whether a
+  reply is needed, and displays any proposed reply. Nothing is spoken
+  automatically; select **Speak response** to send an approved reply through
+  the WebRTC audio mix, or leave it unspoken.
 
 When there is no active meeting state, the notes editor loads the default list
 from `backend/data/notes.md`; users can replace it before starting. Saving
@@ -96,8 +103,8 @@ The API runs at `http://127.0.0.1:8000`.
   right side of the Google Meet tab.
 7. In **Minutes of the Meeting**, optionally enter notes or upload a
   `.txt`/`.md` file, then select **Start meeting**. Use **User Proxy** to
-  refresh transcript-based question suggestions, select one, choose TTS as
-  the audio source, and select **Speak**.
+  converse with the transcript-aware proxy or select and speak one of the
+  suggested questions. Enable the mixer and select TTS to route speech to Meet.
 
 The extension uses these local defaults:
 
@@ -119,7 +126,17 @@ With the backend running, open:
 `http://127.0.0.1:8000/static/test.html`
 
 This page can start and end meetings, send manual or canned transcript events,
-refresh state through REST, and display raw meeting state.
+refresh state through REST, and display raw meeting state. **Load demo
+transcript** supplies fake captions for the conversational proxy to evaluate.
+Review any proposed text and select **Speak approved response** to preview its
+TTS audio. Select **Interrupt** while the proxy is evaluating the transcript to
+test cancellation.
+
+The fake-client regression tests can be run from the repository root:
+
+```powershell
+.\meet_proxy\Scripts\python.exe -m unittest discover -s backend -p test_duplex_llm.py -v
+```
 
 ### Legacy React Frontend
 
