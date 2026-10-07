@@ -50,6 +50,10 @@ class NotesUpdateRequest(BaseModel):
     notes: list[str]
 
 
+class SuggestedQuestions(BaseModel):
+    questions: list[str] = Field(min_length=3, max_length=3)
+
+
 class MeetingState(BaseModel):
     meeting_id: str
     active: bool = True

@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from .matcher import load_notes, load_transcript
 from .retriever import TranscriptRetriever
-from .llm import classify_note
+from .llm import classify_note, suggest_questions
 from .models import (
     Note,
     NoteStatus,
@@ -20,6 +20,7 @@ from .models import (
     MeetingStartRequest,
     TranscriptEvent,
     MeetingState,
+    SuggestedQuestions,
 )
 from .state_engine import MeetingStateEngine
 
@@ -262,6 +263,23 @@ def replace_meeting_notes(meeting_id: str, request: NotesUpdateRequest):
 @app.get("/meeting/{meeting_id}/state")
 def get_meeting_state(meeting_id: str):
     return _get_engine(meeting_id).get_state()
+
+
+@app.post("/meeting/{meeting_id}/questions", response_model=SuggestedQuestions)
+async def get_suggested_questions(meeting_id: str):
+    engine = _get_engine(meeting_id)
+    transcript = engine.state.transcript
+    if not transcript:
+        raise HTTPException(400, "No transcript is available for question suggestions.")
+
+    transcript_text = "\n".join(
+        f"[{event.timestamp}] {event.speaker or 'Unknown'}: {event.text}"
+        for event in transcript
+    )
+    try:
+        return await run_in_threadpool(suggest_questions, transcript_text)
+    except ValueError as error:
+        raise HTTPException(502, str(error)) from error
 
 
 @app.post("/meeting/{meeting_id}/end")

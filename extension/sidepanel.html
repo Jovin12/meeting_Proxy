@@ -443,6 +443,55 @@
       border-top: 1px solid var(--line);
     }
 
+    .questions-section {
+      margin-top: 24px;
+      padding-top: 19px;
+      border-top: 1px solid var(--line);
+    }
+
+    .questions-list {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .question-option {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      align-items: start;
+      gap: 10px;
+      min-height: 44px;
+      padding: 11px 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-control);
+      background: var(--page-deep);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .question-option:has(input:checked) {
+      border-color: var(--ice);
+      background: rgb(2 253 246 / 7%);
+    }
+
+    .question-option input {
+      width: 16px;
+      height: 16px;
+      margin: 1px 0 0;
+      accent-color: var(--ice);
+    }
+
+    .question-option:has(input:disabled) {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
     .source-switch {
       display: flex;
       align-items: center;
@@ -915,6 +964,19 @@
     </section>
 
     <section class="tab-panel" id="userProxyPanel" role="tabpanel" aria-labelledby="userProxyTab" hidden>
+      <section class="questions-section" aria-labelledby="questionsHeading">
+        <header class="section-heading">
+          <div>
+            <h2 class="section-title" id="questionsHeading">Suggested questions</h2>
+            <p class="notes-description">Grounded in the live transcript</p>
+          </div>
+          <button class="button button-quiet" id="refreshQuestions" type="button" disabled>Refresh</button>
+        </header>
+        <fieldset class="questions-list" id="questionsList" aria-label="Choose a question">
+          <legend class="sr-only">Choose a suggested question</legend>
+          <p class="empty-state" id="questionsEmpty">Start a meeting to get question suggestions.</p>
+        </fieldset>
+      </section>
       <section class="voice-mix-section" aria-labelledby="voiceMixHeading">
         <header class="section-heading">
           <div>

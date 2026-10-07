@@ -18,6 +18,19 @@ let isReviewingHistory = false;
 let latestLiveState = null;
 let notesDirty = false;
 let savedMeetings = [];
+let suggestedQuestions = [];
+let selectedQuestionIndex = 0;
+let questionRequestSequence = 0;
+let lastQuestionTranscriptCount = 0;
+let questionRefreshTimer = null;
+let questionsLoading = false;
+
+async function getBackendUrl() {
+  const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
+    backendUrl: "http://127.0.0.1:8000",
+  });
+  return backendUrl.replace(/\/$/, "");
+}
 
 class AudioMixer {
   constructor() {
@@ -89,10 +102,7 @@ class AudioMixer {
     if (!this.enabled) throw new Error("Enable the microphone mix first.");
     if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
 
-    const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
-      backendUrl: "http://127.0.0.1:8000",
-    });
-    const response = await fetch(`${backendUrl.replace(/\/$/, "")}/generate-tts`, {
+    const response = await fetch(`${await getBackendUrl()}/generate-tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
@@ -120,6 +130,8 @@ function updateAudioMixerUI() {
   $("sourceSwitch").dataset.mode = audioMixer.mode;
   $("speechText").disabled = !ttsSelected;
   $("speak").disabled = !ttsSelected;
+  $("refreshQuestions").disabled = questionsLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
+  $("questionsList").disabled = questionsLoading || !suggestedQuestions.length || !isMeetingActive || isReviewingHistory;
 }
 
 const viewTabs = Array.from(document.querySelectorAll('[role="tab"]'));
@@ -132,6 +144,9 @@ function selectViewTab(tab, focus = false) {
     $(viewTab.getAttribute("aria-controls")).hidden = !selected;
   }
   if (focus) tab.focus();
+  if (tab.id === "userProxyTab" && latestLiveState?.transcript?.length) {
+    scheduleQuestionSuggestions();
+  }
 }
 
 function handleViewTabKeydown(event) {
@@ -448,8 +463,90 @@ function renderMeetingState(state) {
   updateNotesEditor(state);
 }
 
+function renderSuggestedQuestions(message = "") {
+  const list = $("questionsList");
+  const legend = list.querySelector("legend");
+  list.replaceChildren(legend);
+
+  if (!suggestedQuestions.length) {
+    list.appendChild(createTextElement("p", "empty-state", message || "Question suggestions will appear here."));
+    return;
+  }
+
+  suggestedQuestions.forEach((question, index) => {
+    const label = document.createElement("label");
+    label.className = "question-option";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "suggestedQuestion";
+    radio.value = String(index);
+    radio.checked = index === selectedQuestionIndex;
+    const text = createTextElement("span", "", question);
+    label.append(radio, text);
+    list.appendChild(label);
+  });
+}
+
+async function loadSuggestedQuestions() {
+  if (!currentMeetingId || !isMeetingActive || isReviewingHistory) return;
+
+  const meetingId = currentMeetingId;
+  const requestSequence = ++questionRequestSequence;
+  questionsLoading = true;
+  renderSuggestedQuestions("Generating questions…");
+  updateAudioMixerUI();
+
+  try {
+    const response = await fetch(`${await getBackendUrl()}/meeting/${encodeURIComponent(meetingId)}/questions`, {
+      method: "POST",
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || `Question request failed (${response.status}).`);
+    if (requestSequence !== questionRequestSequence || meetingId !== currentMeetingId) return;
+
+    suggestedQuestions = Array.isArray(data.questions) ? data.questions : [];
+    selectedQuestionIndex = 0;
+    renderSuggestedQuestions();
+    if (suggestedQuestions.length) {
+      $("speechText").value = suggestedQuestions[0];
+      setStatus("Three questions are ready to ask.", "success");
+    } else {
+      renderSuggestedQuestions("No question suggestions were returned. Refresh to try again.");
+    }
+  } catch (error) {
+    if (requestSequence !== questionRequestSequence) return;
+    suggestedQuestions = [];
+    renderSuggestedQuestions(`Could not load suggestions. ${error.message}`);
+    setStatus(`Could not generate questions. ${error.message}`, "error");
+  } finally {
+    if (requestSequence === questionRequestSequence) {
+      questionsLoading = false;
+      updateAudioMixerUI();
+    }
+  }
+}
+
+function scheduleQuestionSuggestions(force = false) {
+  const transcriptCount = latestLiveState?.transcript?.length || 0;
+  if (!currentMeetingId || !isMeetingActive || isReviewingHistory || !transcriptCount) return;
+  if (!force && transcriptCount <= lastQuestionTranscriptCount) return;
+
+  lastQuestionTranscriptCount = transcriptCount;
+  clearTimeout(questionRefreshTimer);
+  questionRefreshTimer = setTimeout(loadSuggestedQuestions, 1200);
+}
+
 function applyLiveState(state) {
   if (!state) return;
+  if (state.meeting_id && state.meeting_id !== latestLiveState?.meeting_id) {
+    clearTimeout(questionRefreshTimer);
+    questionRequestSequence += 1;
+    suggestedQuestions = [];
+    selectedQuestionIndex = 0;
+    lastQuestionTranscriptCount = 0;
+    questionsLoading = false;
+    renderSuggestedQuestions("Start a meeting to get question suggestions.");
+  }
   latestLiveState = state;
   if (state.meeting_id) currentMeetingId = state.meeting_id;
   isMeetingActive = state.active === true || (state.active === undefined && Boolean(currentMeetingId));
@@ -457,6 +554,10 @@ function applyLiveState(state) {
   if (!isReviewingHistory) {
     renderMeetingState(state);
     updateSessionUI();
+  }
+  updateAudioMixerUI();
+  if ($("userProxyTab").getAttribute("aria-selected") === "true") {
+    scheduleQuestionSuggestions();
   }
 }
 
@@ -593,6 +694,7 @@ async function openSavedMeeting(meetingId) {
       renderTranscript([]);
     }
     updateSessionUI();
+    updateAudioMixerUI();
     setStatus(isMeetingActive ? "Returned to the live meeting." : "Returned to the current meeting view.", "success");
     return;
   }
@@ -607,6 +709,7 @@ async function openSavedMeeting(meetingId) {
     isReviewingHistory = true;
     renderMeetingState(archiveState);
     updateSessionUI();
+    updateAudioMixerUI();
     const startedAt = formatDate(response.meeting.started_at);
     setStatus(`Reviewing saved meeting from ${startedAt}.`);
   } catch (error) {
@@ -627,6 +730,7 @@ function restoreLiveView() {
     renderTranscript([]);
   }
   updateSessionUI();
+  updateAudioMixerUI();
   setStatus(isMeetingActive ? "Returned to the live meeting." : "Returned to the current meeting view.", "success");
 }
 
@@ -647,6 +751,7 @@ function onRuntimeMessage(message) {
     }
     setConnection(false);
     updateSessionUI();
+    updateAudioMixerUI();
     setStatus("Meeting ended.", "success");
   }
 }
@@ -688,6 +793,13 @@ for (const tab of viewTabs) {
 $("toggleAudioMixer").addEventListener("click", toggleAudioMixer);
 $("speak").addEventListener("click", speakText);
 $("sourceMode").addEventListener("change", changeAudioMode);
+$("refreshQuestions").addEventListener("click", () => scheduleQuestionSuggestions(true));
+$("questionsList").addEventListener("change", (event) => {
+  const radio = event.target.closest('input[name="suggestedQuestion"]');
+  if (!radio) return;
+  selectedQuestionIndex = Number(radio.value);
+  $("speechText").value = suggestedQuestions[selectedQuestionIndex] || "";
+});
 window.addEventListener("beforeunload", () => {
   window.parent.postMessage({ source: "meeting-proxy-extension", type: "disable" }, "https://meet.google.com");
 });
