@@ -25,6 +25,12 @@ const STABLE_MS = 800;         // how long text must be unchanged before we emit
 const MAX_EVENT_CHARS = 500;   // safety cap
 const PANEL_HOST_ID = "meeting-proxy-panel-host";
 let panelFrame = null;
+let draftOverlay = null;
+let draftOverlayText = null;
+let draftOverlayStatus = null;
+let approveDraftButton = null;
+let pendingDraftRequestId = null;
+let pendingDraftAction = false;
 
 // ----------------------------------------------------------------
 // Browser-independent panel
@@ -36,6 +42,9 @@ function togglePanel() {
     window.postMessage({ source: "meeting-proxy-content", type: "disable" }, location.origin);
     existing.remove();
     panelFrame = null;
+    draftOverlay = null;
+    pendingDraftRequestId = null;
+    pendingDraftAction = false;
     return;
   }
 
@@ -53,7 +62,14 @@ function togglePanel() {
   close.type = "button";
   close.title = "Close Meeting Proxy";
   close.textContent = "×";
-  close.addEventListener("click", () => host.remove());
+  close.addEventListener("click", () => {
+    window.postMessage({ source: "meeting-proxy-content", type: "disable" }, location.origin);
+    host.remove();
+    panelFrame = null;
+    draftOverlay = null;
+    pendingDraftRequestId = null;
+    pendingDraftAction = false;
+  });
 
   const style = document.createElement("style");
   style.textContent = `
@@ -88,16 +104,164 @@ function togglePanel() {
   const panel = document.createElement("div");
   panel.className = "panel";
   panel.append(frame, close);
-  shadow.append(style, panel);
+  const overlayStyle = document.createElement("style");
+  overlayStyle.textContent = `
+    .draft-overlay {
+      position: fixed;
+      z-index: 2147483647;
+      left: 24px;
+      bottom: 24px;
+      width: min(440px, calc(100vw - 428px));
+      max-height: min(48vh, 380px);
+      overflow: auto;
+      padding: 18px;
+      border: 1px solid #355263;
+      border-radius: 18px;
+      background: #08263a;
+      color: #dae7e3;
+      box-shadow: 0 12px 36px rgb(0 0 0 / 35%);
+      font: 14px/1.45 system-ui, sans-serif;
+    }
+    .draft-overlay[hidden] { display: none; }
+    .draft-overlay h2 { margin: 0 0 8px; font: 700 16px/1.2 system-ui, sans-serif; }
+    .draft-overlay p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .draft-overlay-status { margin-top: 10px !important; color: #97b2ae; font-size: 12px; }
+    .draft-overlay-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .draft-overlay button {
+      position: static;
+      width: auto;
+      height: auto;
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid #355263;
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      font: 650 13px system-ui, sans-serif;
+    }
+    .draft-overlay button:focus-visible { outline: 2px solid #02fdf6; outline-offset: 2px; }
+    .draft-overlay .draft-approve { border-color: transparent; background: #02fdf6; color: #061d2d; }
+    .draft-overlay button:disabled { cursor: wait; opacity: .6; }
+    @media (max-width: 760px) {
+      .draft-overlay { right: 16px; bottom: 16px; left: 16px; width: auto; max-height: 40vh; }
+    }
+  `;
+
+  const draft = document.createElement("section");
+  draft.className = "draft-overlay";
+  draft.hidden = true;
+  draft.setAttribute("role", "dialog");
+  draft.setAttribute("aria-labelledby", "meeting-proxy-draft-heading");
+  draft.setAttribute("aria-live", "polite");
+  const heading = document.createElement("h2");
+  heading.id = "meeting-proxy-draft-heading";
+  heading.textContent = "Meeting Proxy draft";
+  const preview = document.createElement("p");
+  draftOverlayText = preview;
+  const status = document.createElement("p");
+  status.className = "draft-overlay-status";
+  status.textContent = "Ctrl/Cmd + Enter to approve · Esc to discard";
+  draftOverlayStatus = status;
+  const actions = document.createElement("div");
+  actions.className = "draft-overlay-actions";
+  const approve = document.createElement("button");
+  approve.type = "button";
+  approve.className = "draft-approve";
+  approve.textContent = "Approve and speak";
+  approveDraftButton = approve;
+  approve.addEventListener("click", approveCurrentDraft);
+  const discard = document.createElement("button");
+  discard.type = "button";
+  discard.textContent = "Discard";
+  discard.addEventListener("click", discardCurrentDraft);
+  actions.append(approve, discard);
+  draft.append(heading, preview, status, actions);
+  draftOverlay = draft;
+  shadow.append(style, overlayStyle, panel, draft);
   document.documentElement.appendChild(host);
 }
 
-window.addEventListener("message", (event) => {
-  if (event.source !== window || event.data?.source !== "meeting-proxy-audio-bridge") return;
+function sendDraftAction(type) {
   if (!panelFrame?.contentWindow) return;
-
   const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
-  panelFrame.contentWindow.postMessage(event.data, extensionOrigin);
+  panelFrame.contentWindow.postMessage({
+    source: "meeting-proxy-overlay",
+    type,
+    requestId: pendingDraftRequestId,
+  }, extensionOrigin);
+}
+
+function approveCurrentDraft() {
+  if (!pendingDraftRequestId || pendingDraftAction) return;
+  pendingDraftAction = true;
+  approveDraftButton.disabled = true;
+  draftOverlayStatus.textContent = "Sending approved reply…";
+  sendDraftAction("draft-approve");
+}
+
+function discardCurrentDraft() {
+  if (!pendingDraftRequestId) return;
+  sendDraftAction("draft-discard");
+  draftOverlay.hidden = true;
+  pendingDraftRequestId = null;
+  pendingDraftAction = false;
+}
+
+function handleDraftShortcut(event) {
+  if (!draftOverlay || draftOverlay.hidden) return;
+  if (event.target instanceof Element && event.target.closest(
+    "input, textarea, select, [contenteditable='true'], [role='textbox']"
+  )) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    discardCurrentDraft();
+  } else if (
+    event.key === "Enter"
+    && (event.ctrlKey || event.metaKey)
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    approveCurrentDraft();
+  }
+}
+
+document.addEventListener("keydown", handleDraftShortcut, true);
+
+window.addEventListener("message", (event) => {
+  const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
+  if (
+    event.source === window
+    && event.data?.source === "meeting-proxy-audio-bridge"
+  ) {
+    if (panelFrame?.contentWindow) {
+      panelFrame.contentWindow.postMessage(event.data, extensionOrigin);
+    }
+    return;
+  }
+
+  if (
+    event.source !== panelFrame?.contentWindow
+    || event.origin !== extensionOrigin
+    || event.data?.source !== "meeting-proxy-extension"
+  ) return;
+
+  if (event.data.type === "draft-show") {
+    pendingDraftRequestId = event.data.requestId || null;
+    pendingDraftAction = false;
+    draftOverlayText.textContent = event.data.response || "";
+    draftOverlayStatus.textContent = "Ctrl/Cmd + Enter to approve · Esc to discard";
+    approveDraftButton.disabled = false;
+    draftOverlay.hidden = !pendingDraftRequestId || !event.data.response;
+  } else if (event.data.type === "draft-hide") {
+    draftOverlay.hidden = true;
+    pendingDraftRequestId = null;
+    pendingDraftAction = false;
+  } else if (event.data.type === "draft-error") {
+    pendingDraftAction = false;
+    approveDraftButton.disabled = false;
+    draftOverlayStatus.textContent = event.data.detail || "Could not speak the reply. Review it and try again.";
+  }
 });
 
 chrome.runtime.onMessage.addListener((msg) => {

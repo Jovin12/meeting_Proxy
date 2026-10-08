@@ -28,6 +28,13 @@ let conversationBusy = false;
 let activeConversationRequestId = null;
 let conversationAssistantNode = null;
 let lastConversationResponse = "";
+let draftRequestId = null;
+let profileLoaded = false;
+let profileSaving = false;
+let profileFormDirty = false;
+let pendingActiveProfileUpdate = null;
+let audioVolumeApplyTimer = null;
+let audioVolumeSaveTimer = null;
 
 async function getBackendUrl() {
   const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
@@ -39,7 +46,8 @@ async function getBackendUrl() {
 class AudioMixer {
   constructor() {
     this.enabled = false;
-    this.mode = "microphone";
+    this.microphoneVolume = 1;
+    this.ttsVolume = 1;
     this.isSpeaking = false;
     this.pendingRequests = new Map();
     this.requestSequence = 0;
@@ -48,7 +56,12 @@ class AudioMixer {
       if (event.data?.source !== "meeting-proxy-audio-bridge" || event.data.type !== "state") return;
 
       this.enabled = event.data.enabled === true;
-      this.mode = event.data.mode === "tts" ? "tts" : "microphone";
+      if (Number.isFinite(event.data.microphoneVolume)) {
+        this.microphoneVolume = event.data.microphoneVolume;
+      }
+      if (Number.isFinite(event.data.ttsVolume)) {
+        this.ttsVolume = event.data.ttsVolume;
+      }
       this.isSpeaking = event.data.speaking === true;
       updateAudioMixerUI();
       if (event.data.requestId) {
@@ -64,8 +77,6 @@ class AudioMixer {
         setStatus(`Meet audio bridge error. ${event.data.error}`, "error");
       } else if (this.enabled && event.data.senderCount === 0) {
         setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
-      } else if (this.enabled) {
-        setStatus(this.mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
       }
     });
   }
@@ -92,7 +103,10 @@ class AudioMixer {
   }
 
   async start() {
-    return this.request("enable");
+    return this.request("enable", {
+      microphoneVolume: this.microphoneVolume,
+      ttsVolume: this.ttsVolume,
+    });
   }
 
   async stop() {
@@ -100,13 +114,16 @@ class AudioMixer {
     return this.request("disable");
   }
 
-  async setMode(mode) {
-    return this.request("mode", { mode });
+  async setVolumes(microphoneVolume, ttsVolume) {
+    this.microphoneVolume = microphoneVolume;
+    this.ttsVolume = ttsVolume;
+    if (!this.enabled) return null;
+    return this.request("volumes", { microphoneVolume, ttsVolume });
   }
 
   async speak(text) {
     if (!this.enabled) throw new Error("Enable the microphone mix first.");
-    if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
+    if (this.ttsVolume === 0) throw new Error("Increase the TTS volume before speaking.");
 
     const response = await fetch(`${await getBackendUrl()}/generate-tts`, {
       method: "POST",
@@ -124,7 +141,7 @@ class AudioMixer {
 
   async playAudio(audio) {
     if (!this.enabled) throw new Error("Enable the microphone mix first.");
-    if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
+    if (this.ttsVolume === 0) throw new Error("Increase the TTS volume before speaking.");
     return this.request("speak", { audio }, [audio]);
   }
 
@@ -136,24 +153,190 @@ class AudioMixer {
 
 const audioMixer = new AudioMixer();
 
+function postDraftOverlay(type, details = {}) {
+  window.parent.postMessage({
+    source: "meeting-proxy-extension",
+    type,
+    requestId: draftRequestId,
+    ...details,
+  }, "https://meet.google.com");
+}
+
+function dismissDraft() {
+  postDraftOverlay("draft-hide");
+  draftRequestId = null;
+}
+
+function handleDraftShortcut(event) {
+  if (!draftRequestId) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    discardDraft(draftRequestId);
+  } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    event.stopPropagation();
+    speakConversationResponse();
+  }
+}
+
+async function handleOverlayMessage(event) {
+  if (event.source !== window.parent || event.origin !== "https://meet.google.com") return;
+  if (event.data?.source !== "meeting-proxy-overlay") return;
+  if (!draftRequestId || event.data.requestId !== draftRequestId) return;
+
+  if (event.data.type === "draft-approve") {
+    await speakConversationResponse();
+  } else if (event.data.type === "draft-discard") {
+    discardDraft(draftRequestId);
+  }
+}
+
 function updateAudioMixerUI() {
   const active = audioMixer.isActive;
-  const ttsSelected = active && audioMixer.mode === "tts";
-  $("toggleAudioMixer").textContent = active ? "Disable microphone mix" : "Enable microphone mix";
+  const ttsAvailable = active && audioMixer.ttsVolume > 0;
+  $("toggleAudioMixer").textContent = active ? "Disable audio mix" : "Enable audio mix";
   $("toggleAudioMixer").setAttribute("aria-pressed", String(active));
-  $("sourceMode").checked = audioMixer.mode === "tts";
-  $("sourceMode").setAttribute("aria-checked", String(audioMixer.mode === "tts"));
-  $("sourceMode").disabled = !active;
-  $("sourceSwitch").dataset.mode = audioMixer.mode;
-  $("speechText").disabled = !ttsSelected;
-  $("speak").disabled = !ttsSelected;
+  $("microphoneVolume").value = String(Math.round(audioMixer.microphoneVolume * 100));
+  $("microphoneVolumeValue").textContent = `${Math.round(audioMixer.microphoneVolume * 100)}%`;
+  $("microphoneVolume").disabled = !active;
+  $("ttsVolume").value = String(Math.round(audioMixer.ttsVolume * 100));
+  $("ttsVolumeValue").textContent = `${Math.round(audioMixer.ttsVolume * 100)}%`;
+  $("ttsVolume").disabled = !active;
+  $("speechText").disabled = !ttsAvailable;
+  $("speak").disabled = !ttsAvailable;
   $("conversationInterrupt").disabled = !conversationBusy && !audioMixer.isSpeaking;
-  $("conversationSpeak").disabled = !lastConversationResponse || !ttsSelected || !isMeetingActive || isReviewingHistory;
+  $("conversationSpeak").disabled = !lastConversationResponse || !ttsAvailable || !isMeetingActive || isReviewingHistory;
   $("refreshQuestions").disabled = questionsLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
   $("questionsList").disabled = questionsLoading || !suggestedQuestions.length || !isMeetingActive || isReviewingHistory;
 }
 
 const viewTabs = Array.from(document.querySelectorAll('[role="tab"]'));
+const profileFieldset = $("profileFieldset");
+const profileTasks = $("profileTasks");
+
+function setProfileStatus(message, kind = "info") {
+  const status = $("profileStatus");
+  status.textContent = message;
+  status.dataset.kind = kind;
+}
+
+function setProfileFormEnabled(enabled) {
+  profileFieldset.disabled = !enabled || profileSaving;
+  $("reloadProfile").disabled = profileSaving;
+}
+
+function appendProfileTask(task = {}) {
+  const template = $("profileTaskTemplate");
+  const row = template.content.firstElementChild.cloneNode(true);
+  row.querySelector("[data-task-title]").value = task.title || "";
+  row.querySelector("[data-task-status]").value = task.status || "not_started";
+  row.querySelector("[data-remove-task]").addEventListener("click", () => row.remove());
+  profileTasks.appendChild(row);
+}
+
+function renderUserProfile(profile) {
+  $("profileName").value = profile.name || "";
+  $("profileBackground").value = profile.background || "";
+  profileTasks.replaceChildren();
+  for (const task of profile.tasks || []) appendProfileTask(task);
+  profileLoaded = true;
+  profileFormDirty = false;
+  setProfileFormEnabled(true);
+}
+
+function handleActiveProfileUpdate(profile) {
+  if (!Array.isArray(profile?.tasks)) return;
+  if (!profileLoaded) {
+    pendingActiveProfileUpdate = profile;
+    return;
+  }
+  if (!profileFormDirty) {
+    renderUserProfile(profile);
+    setProfileStatus("Meeting task memory updated from the latest captions.", "success");
+    return;
+  }
+
+  const existingRows = new Map(
+    Array.from(profileTasks.children, (row) => [
+      row.querySelector("[data-task-title]").value.trim().toLocaleLowerCase(),
+      row,
+    ])
+  );
+  for (const task of profile.tasks) {
+    const title = task.title.trim();
+    const existingRow = existingRows.get(title.toLocaleLowerCase());
+    if (existingRow) {
+      existingRow.querySelector("[data-task-status]").value = task.status;
+    } else {
+      appendProfileTask(task);
+    }
+  }
+  setProfileStatus("Meeting task memory updated; your unsaved profile edits were kept.", "success");
+}
+
+async function requestUserProfile(method, body) {
+  const options = { method, headers: { "Content-Type": "application/json" } };
+  if (body !== undefined) options.body = JSON.stringify(body);
+  const response = await fetch(`${await getBackendUrl()}/user-profile`, options);
+  if (!response.ok) {
+    let detail = await response.text();
+    try {
+      detail = JSON.parse(detail).detail || detail;
+    } catch {
+      // Keep the response text when the service does not return JSON.
+    }
+    throw new Error(detail || `Profile request failed (${response.status}).`);
+  }
+  return response.json();
+}
+
+async function loadUserProfile() {
+  setProfileStatus("Loading your saved profile…");
+  setProfileFormEnabled(false);
+  try {
+    renderUserProfile(await requestUserProfile("GET"));
+    if (pendingActiveProfileUpdate) {
+      const pendingProfile = pendingActiveProfileUpdate;
+      pendingActiveProfileUpdate = null;
+      handleActiveProfileUpdate(pendingProfile);
+    } else {
+      setProfileStatus("Your profile is loaded.", "success");
+    }
+  } catch (error) {
+    profileLoaded = false;
+    setProfileStatus(`Could not load your profile. ${error.message}`, "error");
+  }
+}
+
+async function saveUserProfile() {
+  if (!profileLoaded || profileSaving) return;
+  const profile = {
+    name: $("profileName").value.trim(),
+    background: $("profileBackground").value.trim(),
+    tasks: Array.from(profileTasks.children)
+      .map((row) => ({
+        title: row.querySelector("[data-task-title]").value.trim(),
+        status: row.querySelector("[data-task-status]").value,
+      }))
+      .filter((task) => task.title),
+  };
+
+  profileSaving = true;
+  setProfileFormEnabled(true);
+  $("saveProfile").textContent = "Saving…";
+  setProfileStatus("Saving your profile…");
+  try {
+    renderUserProfile(await requestUserProfile("PUT", profile));
+    setProfileStatus("Profile saved. New proxy replies will use this context.", "success");
+  } catch (error) {
+    setProfileStatus(`Could not save your profile. ${error.message}`, "error");
+  } finally {
+    profileSaving = false;
+    setProfileFormEnabled(profileLoaded);
+    $("saveProfile").textContent = "Save profile";
+  }
+}
 
 function selectViewTab(tab, focus = false) {
   for (const viewTab of viewTabs) {
@@ -192,9 +375,11 @@ async function toggleAudioMixer() {
     } else {
       setStatus("Connecting to the Meet microphone sender…");
       const state = await audioMixer.start();
-      audioMixer.mode = state.mode === "tts" ? "tts" : "microphone";
-      if (state.senderCount > 0) setStatus("Microphone selected for Meet.", "success");
-      else setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
+      if (state.senderCount > 0) {
+        setStatus("Microphone and TTS are mixed at their selected volumes.", "success");
+      } else {
+        setStatus("Mixer enabled with microphone and TTS at their selected volumes. Turn on the Meet microphone to route audio.", "success");
+      }
     }
   } catch (error) {
     setStatus(`Could not start the microphone mix. ${error.message}`, "error");
@@ -204,20 +389,41 @@ async function toggleAudioMixer() {
   }
 }
 
-async function changeAudioMode(event) {
-  const toggle = event.currentTarget;
-  const mode = toggle.checked ? "tts" : "microphone";
-  toggle.disabled = true;
-  try {
-    const state = await audioMixer.setMode(mode);
-    audioMixer.mode = state.mode;
-    setStatus(mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
-  } catch (error) {
-    toggle.checked = audioMixer.mode === "tts";
-    setStatus(`Could not switch the audio source. ${error.message}`, "error");
-  } finally {
-    updateAudioMixerUI();
-  }
+async function changeAudioVolume() {
+  const microphoneVolume = Number($("microphoneVolume").value) / 100;
+  const ttsVolume = Number($("ttsVolume").value) / 100;
+  audioMixer.microphoneVolume = microphoneVolume;
+  audioMixer.ttsVolume = ttsVolume;
+  updateAudioMixerUI();
+  clearTimeout(audioVolumeApplyTimer);
+  audioVolumeApplyTimer = setTimeout(async () => {
+    try {
+      await audioMixer.setVolumes(audioMixer.microphoneVolume, audioMixer.ttsVolume);
+    } catch (error) {
+      setStatus(`Could not update audio volumes. ${error.message}`, "error");
+    }
+  }, ttsVolume === 0 ? 0 : 80);
+
+  clearTimeout(audioVolumeSaveTimer);
+  audioVolumeSaveTimer = setTimeout(async () => {
+    try {
+      await chrome.storage.sync.set({
+        microphoneVolume: Math.round(audioMixer.microphoneVolume * 100),
+        ttsVolume: Math.round(audioMixer.ttsVolume * 100),
+      });
+    } catch (error) {
+      setStatus(`Audio volumes changed but could not be saved. ${error.message}`, "error");
+    }
+  }, 500);
+
+  setStatus(
+    ttsVolume === 0
+      ? "TTS muted."
+      : microphoneVolume === 0
+        ? "Microphone muted."
+        : "Audio volumes updated.",
+    "success"
+  );
 }
 
 async function speakText() {
@@ -238,7 +444,7 @@ async function speakText() {
     setStatus(`Could not generate speech. ${error.message}`, "error");
   } finally {
     button.textContent = "Speak";
-    button.disabled = !audioMixer.isActive;
+    updateAudioMixerUI();
   }
 }
 
@@ -256,19 +462,35 @@ function appendConversationTurn(role, text) {
 
 async function speakConversationResponse() {
   if (!lastConversationResponse || !isMeetingActive || isReviewingHistory) return;
+  if (!audioMixer.isActive || audioMixer.ttsVolume <= 0) {
+    const detail = "Enable the audio mix and set TTS volume above 0% to speak this draft.";
+    setStatus(detail, "error");
+    postDraftOverlay("draft-error", { detail });
+    return;
+  }
   const button = $("conversationSpeak");
   button.disabled = true;
   button.textContent = "Generating speech…";
   try {
     if (audioMixer.isSpeaking) await audioMixer.stopSpeech();
     await audioMixer.speak(lastConversationResponse);
+    dismissDraft();
     setStatus("Approved response sent to Meet.", "success");
   } catch (error) {
     setStatus(`Could not speak the approved response. ${error.message}`, "error");
+    postDraftOverlay("draft-error", { detail: error.message });
   } finally {
     button.textContent = "Speak response";
     updateAudioMixerUI();
   }
+}
+
+function discardDraft(requestId) {
+  if (!draftRequestId || requestId !== draftRequestId) return;
+  lastConversationResponse = "";
+  dismissDraft();
+  updateAudioMixerUI();
+  setStatus("Draft discarded.", "success");
 }
 
 async function interruptConversation() {
@@ -299,6 +521,7 @@ async function interruptConversation() {
   }
   conversationBusy = false;
   activeConversationRequestId = null;
+  dismissDraft();
   updateAudioMixerUI();
   if (wasGenerating) {
     setStatus("Transcript response generation interrupted.");
@@ -319,6 +542,7 @@ function handleConversationEvent(event) {
         }
       }
       activeConversationRequestId = null;
+      dismissDraft();
       updateAudioMixerUI();
       setStatus("Transcript response generation interrupted.");
     }
@@ -329,6 +553,7 @@ function handleConversationEvent(event) {
     activeConversationRequestId = event.request_id;
     conversationBusy = true;
     lastConversationResponse = "";
+    dismissDraft();
     conversationAssistantNode = appendConversationTurn("assistant", "Reviewing the latest transcript…");
     $("conversationTopic").textContent = event.current_topic
       ? `Current topic: ${event.current_topic}`
@@ -349,7 +574,11 @@ function handleConversationEvent(event) {
     setStatus("No response needed.", "success");
   } else if (event.type === "conversation_complete") {
     lastConversationResponse = event.response || "";
+    draftRequestId = lastConversationResponse ? event.request_id : null;
     if (conversationAssistantNode) conversationAssistantNode.textContent = lastConversationResponse;
+    if (draftRequestId) {
+      postDraftOverlay("draft-show", { response: lastConversationResponse });
+    }
     if (event.current_topic) $("conversationTopic").textContent = `Current topic: ${event.current_topic}`;
     conversationBusy = false;
     activeConversationRequestId = null;
@@ -358,6 +587,7 @@ function handleConversationEvent(event) {
   } else if (event.type === "conversation_error") {
     conversationBusy = false;
     activeConversationRequestId = null;
+    dismissDraft();
     if (conversationAssistantNode) {
       conversationAssistantNode.textContent = `Proxy error: ${event.detail || "unknown error"}`;
     }
@@ -406,6 +636,8 @@ function updateSessionUI() {
     notesFieldset.disabled = true;
     return;
   }
+
+  chrome.runtime.onMessage.addListener(onRuntimeMessage);
 
   returnToLiveButton.hidden = true;
   notesFieldset.disabled = false;
@@ -682,6 +914,7 @@ function scheduleQuestionSuggestions(force = false) {
 function applyLiveState(state) {
   if (!state) return;
   if (state.meeting_id && state.meeting_id !== latestLiveState?.meeting_id) {
+    dismissDraft();
     clearTimeout(questionRefreshTimer);
     questionRequestSequence += 1;
     suggestedQuestions = [];
@@ -714,6 +947,7 @@ function applyLiveState(state) {
   }
   if (transcriptChanged) {
     lastConversationResponse = "";
+    dismissDraft();
     if (conversationAssistantNode) {
       conversationAssistantNode.dataset.interrupted = "true";
       conversationAssistantNode.textContent = "New transcript received; checking whether a response is needed.";
@@ -830,6 +1064,7 @@ async function endMeeting() {
     currentMeetingId = null;
     isMeetingActive = false;
     meetingHasEnded = true;
+    dismissDraft();
     if (latestLiveState) {
       latestLiveState = { ...latestLiveState, active: false };
       if (!isReviewingHistory) renderMeetingState(latestLiveState);
@@ -907,6 +1142,8 @@ function onRuntimeMessage(message) {
     setStatus(message.detail || "The local service reported an error.", "error");
   } else if (message.type === "conversation") {
     handleConversationEvent(message.event);
+  } else if (message.type === "user-profile-update") {
+    handleActiveProfileUpdate(message.profile);
   } else if (message.type === "ended") {
     currentMeetingId = null;
     isMeetingActive = false;
@@ -928,6 +1165,15 @@ function onRuntimeMessage(message) {
 notesInput.addEventListener("input", () => {
   notesDirty = true;
 });
+
+$("profileFieldset").addEventListener("input", () => {
+  profileFormDirty = true;
+});
+$("profileFieldset").addEventListener("change", () => {
+  profileFormDirty = true;
+});
+window.addEventListener("message", handleOverlayMessage);
+document.addEventListener("keydown", handleDraftShortcut);
 
 $("updateNotes").addEventListener("click", saveNotes);
 $("uploadNotes").addEventListener("click", () => $("notesFile").click());
@@ -953,6 +1199,9 @@ $("notesFile").addEventListener("change", async (event) => {
 
 $("start").addEventListener("click", startMeeting);
 $("end").addEventListener("click", endMeeting);
+$("addProfileTask").addEventListener("click", () => appendProfileTask());
+$("reloadProfile").addEventListener("click", loadUserProfile);
+$("saveProfile").addEventListener("click", saveUserProfile);
 $("returnToLive").addEventListener("click", restoreLiveView);
 historySelect.addEventListener("change", (event) => openSavedMeeting(event.target.value));
 for (const tab of viewTabs) {
@@ -963,7 +1212,8 @@ $("toggleAudioMixer").addEventListener("click", toggleAudioMixer);
 $("speak").addEventListener("click", speakText);
 $("conversationInterrupt").addEventListener("click", interruptConversation);
 $("conversationSpeak").addEventListener("click", speakConversationResponse);
-$("sourceMode").addEventListener("change", changeAudioMode);
+$("microphoneVolume").addEventListener("input", changeAudioVolume);
+$("ttsVolume").addEventListener("input", changeAudioVolume);
 $("refreshQuestions").addEventListener("click", () => scheduleQuestionSuggestions(true));
 $("questionsList").addEventListener("change", (event) => {
   const radio = event.target.closest('input[name="suggestedQuestion"]');
@@ -982,9 +1232,30 @@ async function initialize() {
     renderNotes([]);
     renderTranscript([]);
     updateSessionUI();
+    setProfileStatus("Open this panel from the Meeting Proxy extension on Google Meet.", "error");
     setStatus("Open this panel from the Meeting Proxy extension on Google Meet.");
     return;
   }
+
+  try {
+    const audioSettings = await chrome.storage.sync.get({
+      microphoneVolume: 100,
+      ttsVolume: 100,
+    });
+    const savedMicrophoneVolume = Number(audioSettings.microphoneVolume);
+    const savedTtsVolume = Number(audioSettings.ttsVolume);
+    audioMixer.microphoneVolume = Number.isFinite(savedMicrophoneVolume)
+      ? Math.min(100, Math.max(0, savedMicrophoneVolume)) / 100
+      : 1;
+    audioMixer.ttsVolume = Number.isFinite(savedTtsVolume)
+      ? Math.min(100, Math.max(0, savedTtsVolume)) / 100
+      : 1;
+    updateAudioMixerUI();
+  } catch (error) {
+    setStatus(`Could not load saved audio volumes. ${error.message}`, "error");
+  }
+
+  await loadUserProfile();
 
   try {
     const port = chrome.runtime.connect({ name: "keepalive" });
@@ -994,8 +1265,6 @@ async function initialize() {
   } catch (error) {
     console.warn("[sidepanel] keepalive connection failed:", error);
   }
-
-  chrome.runtime.onMessage.addListener(onRuntimeMessage);
 
   try {
     const status = await sendMessage({ type: "get-status" });

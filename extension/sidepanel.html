@@ -75,6 +75,7 @@
     button:focus-visible,
     summary:focus-visible,
     textarea:focus-visible,
+    input:focus-visible,
     select:focus-visible {
       outline: 2px solid var(--ice);
       outline-offset: 3px;
@@ -140,7 +141,7 @@
 
     .tab-list {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 4px;
       margin-top: 14px;
       border-bottom: 1px solid var(--line);
@@ -542,68 +543,38 @@
       opacity: 0.58;
     }
 
-    .source-switch {
-      display: flex;
+    .volume-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      justify-content: flex-start;
-      gap: 10px;
-      width: fit-content;
-      min-height: 44px;
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
+      gap: 5px 12px;
+      margin-top: 16px;
     }
 
-    .source-switch[data-mode="microphone"] #microphoneModeLabel,
-    .source-switch[data-mode="tts"] #ttsModeLabel {
-      color: var(--ice);
-    }
-
-    .source-toggle {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex: 0 0 auto;
+    .volume-control input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-height: 34px;
       margin: 0;
-      appearance: none;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--page-deep);
+      accent-color: var(--ice);
       cursor: pointer;
-      transition: background-color 140ms ease, border-color 140ms ease;
     }
 
-    .source-toggle::before {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--muted);
-      content: "";
-      transition: transform 140ms ease, background-color 140ms ease;
-    }
-
-    .source-toggle:checked {
-      border-color: var(--ice);
-      background: rgb(2 253 246 / 14%);
-    }
-
-    .source-toggle:checked::before {
-      transform: translateX(20px);
-      background: var(--ice);
-    }
-
-    .source-toggle:disabled {
+    .volume-control input[type="range"]:disabled {
       cursor: not-allowed;
       opacity: 0.58;
     }
 
-    .source-toggle:focus-visible {
-      outline: 2px solid var(--ice);
-      outline-offset: 3px;
+    .volume-label {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .volume-value {
+      color: var(--ice);
+      font-family: var(--font-mono);
+      font-size: 12px;
     }
 
     .speech-controls {
@@ -855,6 +826,74 @@
       text-overflow: ellipsis;
     }
 
+    .profile-fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .profile-field {
+      margin-top: 16px;
+    }
+
+    .profile-background {
+      min-height: 120px;
+      padding: 11px 12px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .notes-input[type="text"] {
+      padding: 0 12px;
+    }
+
+    .profile-tasks {
+      display: grid;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .profile-task-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-control);
+      background: var(--page-deep);
+    }
+
+    .profile-task-title {
+      grid-column: 1 / -1;
+    }
+
+    .profile-task-status {
+      min-width: 0;
+    }
+
+    .profile-task-remove {
+      min-height: 44px;
+      padding: 0 10px;
+    }
+
+    .profile-status {
+      min-height: 18px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .profile-status[data-kind="success"] {
+      color: var(--ice);
+    }
+
+    .profile-status[data-kind="error"] {
+      color: #ff91b2;
+    }
+
     .editor-actions {
       display: flex;
       gap: var(--space-2);
@@ -946,6 +985,7 @@
     <div class="tab-list" role="tablist" aria-label="Meeting Proxy views">
       <button class="tab-button" id="minutesTab" type="button" role="tab" aria-controls="minutesPanel" aria-selected="true" tabindex="0">Minutes of the Meeting</button>
       <button class="tab-button" id="userProxyTab" type="button" role="tab" aria-controls="userProxyPanel" aria-selected="false" tabindex="-1">User Proxy</button>
+      <button class="tab-button" id="settingsTab" type="button" role="tab" aria-controls="settingsPanel" aria-selected="false" tabindex="-1">User settings</button>
     </div>
 
     <section class="tab-panel" id="minutesPanel" role="tabpanel" aria-labelledby="minutesTab">
@@ -1029,7 +1069,7 @@
             <button class="button button-secondary" id="conversationInterrupt" type="button" disabled>Interrupt</button>
             <button class="button button-primary" id="conversationSpeak" type="button" disabled>Speak response</button>
           </div>
-          <p class="notes-description">Speaking requires the audio mixer enabled and TTS selected.</p>
+          <p class="notes-description">Speaking requires the audio mix enabled and TTS volume above 0%.</p>
         </div>
       </section>
       <section class="questions-section" aria-labelledby="questionsHeading">
@@ -1049,14 +1089,19 @@
         <header class="section-heading">
           <div>
             <h2 class="section-title" id="voiceMixHeading">Voice mix</h2>
-            <p class="notes-description">Choose which audio Meet sends</p>
+            <p class="notes-description">Microphone and TTS are mixed together. Set either level to 0% to mute it.</p>
           </div>
         </header>
-        <button class="button button-secondary" id="toggleAudioMixer" type="button">Enable microphone mix</button>
-        <label class="source-switch" id="sourceSwitch" data-mode="microphone">
-          <span id="microphoneModeLabel">Microphone</span>
-          <input class="source-toggle" id="sourceMode" type="checkbox" role="switch" aria-label="Choose generated speech instead of microphone" aria-checked="false" disabled>
-          <span id="ttsModeLabel">TTS</span>
+        <button class="button button-secondary" id="toggleAudioMixer" type="button">Enable audio mix</button>
+        <label class="volume-control" for="microphoneVolume">
+          <span class="volume-label">Microphone volume</span>
+          <output class="volume-value" id="microphoneVolumeValue" for="microphoneVolume">100%</output>
+          <input id="microphoneVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Microphone volume" disabled>
+        </label>
+        <label class="volume-control" for="ttsVolume">
+          <span class="volume-label">TTS volume</span>
+          <output class="volume-value" id="ttsVolumeValue" for="ttsVolume">100%</output>
+          <input id="ttsVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Text-to-speech volume" disabled>
         </label>
         <div class="speech-controls">
           <label class="editor-label" for="speechText">Text to speak</label>
@@ -1067,6 +1112,61 @@
         </div>
       </section>
     </section>
+
+    <section class="tab-panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsTab" hidden>
+      <section class="section" aria-labelledby="profileHeading">
+        <header class="section-heading">
+          <div>
+            <h2 class="section-title" id="profileHeading">Your profile</h2>
+            <p class="notes-description">Used to give the proxy context for meeting replies.</p>
+          </div>
+          <button class="button button-quiet" id="reloadProfile" type="button">Reload</button>
+        </header>
+        <fieldset class="profile-fieldset" id="profileFieldset" disabled>
+          <legend class="sr-only">User profile and tasks</legend>
+          <div class="profile-field">
+            <label class="editor-label" for="profileName">Name</label>
+            <input class="notes-input" id="profileName" type="text" maxlength="120" autocomplete="name" placeholder="Your name">
+          </div>
+          <div class="profile-field">
+            <label class="editor-label" for="profileBackground">Background</label>
+            <textarea class="notes-input profile-background" id="profileBackground" maxlength="5000" placeholder="Your role, experience, and relevant context"></textarea>
+          </div>
+          <div class="profile-field">
+            <div class="section-heading">
+              <div>
+                <p class="editor-label">Tasks</p>
+                <p class="notes-description">Track priorities and their current status.</p>
+              </div>
+              <button class="button button-quiet" id="addProfileTask" type="button">Add task</button>
+            </div>
+            <div class="profile-tasks" id="profileTasks"></div>
+          </div>
+          <div class="editor-actions">
+            <button class="button button-primary" id="saveProfile" type="button">Save profile</button>
+          </div>
+        </fieldset>
+        <p class="profile-status" id="profileStatus" role="status" aria-live="polite">Loading your saved profile…</p>
+      </section>
+    </section>
+
+    <template id="profileTaskTemplate">
+      <div class="profile-task-row">
+        <label class="editor-label profile-task-title">
+          Task
+          <input class="notes-input" data-task-title type="text" maxlength="240" placeholder="Describe a task">
+        </label>
+        <label class="editor-label profile-task-status">
+          Status
+          <select class="history-select" data-task-status>
+            <option value="not_started">Not started</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+        <button class="button button-quiet profile-task-remove" data-remove-task type="button" aria-label="Remove task">Remove</button>
+      </div>
+    </template>
 
     <p class="status-message" id="status" role="status" aria-live="polite" aria-atomic="true"></p>
   </main>

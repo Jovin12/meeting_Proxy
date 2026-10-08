@@ -7,12 +7,13 @@ are open, partially addressed, or completed.
 The main experience is a Manifest V3 browser extension. It captures finalized
 Google Meet captions and displays the live transcript and note status in a
 custom panel. The panel separates meeting notes from **User Proxy**, which can
-switch Meet's outgoing audio between its selected microphone and generated
-Pocket TTS speech. The User Proxy also generates transcript-grounded question
-suggestions and observes the live conversation to propose replies. Proposed
-replies are shown for approval; they are sent to Meet only when the user selects
-**Speak response**. Ollama and semantic retrieval provide evidence for note
-classification.
+mix Meet's microphone with generated Pocket TTS speech at the same time. Its
+independent microphone and TTS volume sliders range from muted to full volume
+and default to 100% when the mix is enabled. The User Proxy also generates
+transcript-grounded question suggestions and observes the live conversation to
+propose replies. Proposed replies are shown for approval; they are sent to Meet
+only when the user selects **Speak response**. Ollama and semantic retrieval
+provide evidence for note classification.
 
 ## High-Level Architecture
 
@@ -28,7 +29,7 @@ The system is organized into four areas:
   `TranscriptRetriever`, stored in in-memory ChromaDB, and matched to notes.
 - **External AI service:** local Ollama runs `llama3.2:3b` and returns
   structured note classifications, suggested questions, and transcript-driven
-  conversational decisions and reply proposals.
+  conversational decisions, reply proposals, and explicit task-memory updates.
 
 ## What It Does
 
@@ -44,15 +45,26 @@ The system is organized into four areas:
    later LLM calls.
 7. The updated meeting state is sent back to the extension panel.
 8. In **User Proxy**, the proxy observes transcript updates, decides whether a
-  reply is needed, and displays any proposed reply. Nothing is spoken
-  automatically; select **Speak response** to send an approved reply through
-  the WebRTC audio mix, or leave it unspoken.
+  reply is needed, and displays proposed replies in a local overlay on the
+  Meet page. Nothing is spoken automatically; select **Approve and speak** or
+  press `Ctrl/Cmd+Enter` to approve, or press `Escape` to discard.
+
+The profile task list is also updated in the background when a caption clearly
+assigns a task to the user or explicitly changes one of their task statuses.
+Only explicit assignments and progress statements are applied; generic group
+requests are not assigned to the user.
 
 When there is no active meeting state, the notes editor loads the default list
 from `backend/data/notes.md`; users can replace it before starting. Saving
 notes writes the list to `backend/data/notes.md` and updates the active meeting
 immediately. The panel also supports saved-meeting review, including the
 captured transcript and final note matches.
+
+The **User settings** tab stores the participant's name, background, and tasks
+with their statuses in the local backend at `backend/data/user_profile.json`.
+The conversational proxy uses this profile when preparing future reply
+suggestions, including updates made during an active meeting. It is intended
+for local use with the local backend and Ollama.
 
 ## Requirements
 
@@ -104,7 +116,8 @@ The API runs at `http://127.0.0.1:8000`.
 7. In **Minutes of the Meeting**, optionally enter notes or upload a
   `.txt`/`.md` file, then select **Start meeting**. Use **User Proxy** to
   converse with the transcript-aware proxy or select and speak one of the
-  suggested questions. Enable the mixer and select TTS to route speech to Meet.
+  suggested questions. Enable the audio mix to send both microphone and TTS to
+  Meet, then adjust their independent volume sliders as needed.
 
 The extension uses these local defaults:
 
@@ -228,7 +241,18 @@ POST /meeting/{meeting_id}/questions
 Uses the meeting's transcript so far and local Ollama to return exactly three
 concise questions as `{"questions": ["...", "...", "..."]}`. The User Proxy
 requests suggestions when opened and refreshes them after new transcript
-events while the tab is visible.
+events while the tab is visible. Suggestions use the saved participant profile
+and only captions from other speakers; if only the participant's own captions
+are available, the endpoint asks the client to wait for other participants
+instead of generating self-directed questions.
+
+### Draft approval
+
+Completed reply proposals appear in a private floating overlay over the local
+Google Meet page. Use **Approve and speak** or `Ctrl/Cmd+Enter` to send the
+approved draft as TTS; use **Discard** or `Escape` to dismiss it. The overlay is
+rendered by the extension content script and is not part of the meeting video
+or visible to other participants.
 
 Flat convenience routes are also available at `/meeting/state`,
 `/meeting/end`, and `/meeting/event` for the newest meeting.
@@ -248,6 +272,30 @@ GET /meetings/{meeting_id}
 unchanged notes retain their analysis, new notes start as `open`, and removed
 notes are removed. `GET /meetings` lists saved meetings newest first, while
 `GET /meetings/{meeting_id}` returns the saved transcript and note state.
+
+### Manage the participant profile
+
+```http
+GET /user-profile
+PUT /user-profile
+Content-Type: application/json
+```
+
+The profile contains a name, background, and task list. Each task status is
+`not_started`, `in_progress`, or `completed`. The backend saves this data
+locally in `backend/data/user_profile.json`; updates are available to the proxy
+for future response suggestions, including during an active meeting.
+
+```json
+{
+  "name": "Jordan Lee",
+  "background": "Product lead for the mobile launch.",
+  "tasks": [
+    {"title": "Confirm launch date", "status": "in_progress"},
+    {"title": "Send release notes", "status": "not_started"}
+  ]
+}
+```
 
 ## Repository Layout
 
@@ -276,6 +324,8 @@ Important runtime files include:
 - `extension/background.js`: backend session and WebSocket relay.
 - `extension/meet_audio_bridge.js`: experimental Meet outgoing-audio bridge.
 - `extension/sidepanel.js`: live transcript, note-state, editing, and history UI.
+- `backend/data/user_profile.json`: local participant profile and task context,
+  created when a profile is first saved.
 - `backend/data/notes.md`: default note list, updated by the panel's Save notes
   action.
 - `backend/data/meeting_history.json`: persisted meeting snapshots and UTC

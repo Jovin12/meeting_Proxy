@@ -16,7 +16,8 @@
   let microphoneGain = null;
   let ttsGain = null;
   let enabled = false;
-  let mode = "microphone";
+  let microphoneVolume = 1;
+  let ttsVolume = 1;
 
   function mixedTrack() {
     return destination?.stream.getAudioTracks()[0] ?? null;
@@ -28,7 +29,8 @@
       type: "state",
       requestId,
       enabled,
-      mode,
+      microphoneVolume,
+      ttsVolume,
       speaking: ttsSources.size > 0,
       senderCount: senderOriginalTracks.size,
       error,
@@ -55,7 +57,7 @@
     await nativeReplaceTrack.call(sender, connectInputTrack(track));
   }
 
-  async function enableMix() {
+  async function enableMix(volumes = {}) {
     if (enabled) return;
     if (!NativePeerConnection || !nativeReplaceTrack) {
       throw new Error("This browser does not expose the required WebRTC sender APIs.");
@@ -71,8 +73,10 @@
     destination = context.createMediaStreamDestination();
     microphoneGain = context.createGain();
     ttsGain = context.createGain();
-    microphoneGain.gain.value = 1;
-    ttsGain.gain.value = 0;
+    microphoneVolume = normalizeVolume(volumes.microphoneVolume, 1);
+    ttsVolume = normalizeVolume(volumes.ttsVolume, 1);
+    microphoneGain.gain.value = microphoneVolume;
+    ttsGain.gain.value = ttsVolume;
     microphoneGain.connect(destination);
     ttsGain.connect(destination);
     enabled = true;
@@ -86,7 +90,6 @@
 
   async function disableMix() {
     enabled = false;
-    mode = "microphone";
     for (const [sender, originalTrack] of senderOriginalTracks) {
       try {
         await nativeReplaceTrack.call(sender, originalTrack);
@@ -113,12 +116,12 @@
   }
 
   async function playTts(audioData) {
-    if (!enabled || mode !== "tts" || !audioContext || Object.prototype.toString.call(audioData) !== "[object ArrayBuffer]") {
-      throw new Error("Switch the audio source to TTS before speaking.");
+    if (!enabled || ttsVolume === 0 || !audioContext || Object.prototype.toString.call(audioData) !== "[object ArrayBuffer]") {
+      throw new Error("Enable the microphone mix and set TTS volume above zero before speaking.");
     }
 
     const buffer = await audioContext.decodeAudioData(audioData);
-    if (!enabled || mode !== "tts") throw new Error("TTS mode was switched off before playback started.");
+    if (!enabled || ttsVolume === 0) throw new Error("TTS was muted before playback started.");
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(ttsGain);
@@ -142,15 +145,19 @@
     ttsSources.clear();
   }
 
-  function setMode(nextMode) {
-    if (!enabled || !audioContext) throw new Error("Enable the microphone mix before switching its source.");
-    if (nextMode !== "microphone" && nextMode !== "tts") throw new Error("Unknown audio source.");
+  function normalizeVolume(value, fallback = 1) {
+    const volume = Number(value);
+    return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : fallback;
+  }
 
-    mode = nextMode;
+  function setVolumes(volumes = {}) {
+    if (!enabled || !audioContext) throw new Error("Enable the microphone mix before adjusting source volume.");
+    microphoneVolume = normalizeVolume(volumes.microphoneVolume, microphoneVolume);
+    ttsVolume = normalizeVolume(volumes.ttsVolume, ttsVolume);
     const now = audioContext.currentTime;
-    microphoneGain.gain.setValueAtTime(mode === "microphone" ? 1 : 0, now);
-    ttsGain.gain.setValueAtTime(mode === "tts" ? 1 : 0, now);
-    if (mode === "microphone") stopTtsSources();
+    microphoneGain.gain.setValueAtTime(microphoneVolume, now);
+    ttsGain.gain.setValueAtTime(ttsVolume, now);
+    if (ttsVolume === 0) stopTtsSources();
   }
 
   if (NativePeerConnection && nativeReplaceTrack) {
@@ -206,11 +213,11 @@
     if (message?.source !== "meeting-proxy-extension" && !fromContentScript) return;
 
     try {
-      if (message.type === "enable") await enableMix();
+      if (message.type === "enable") await enableMix(message);
       else if (message.type === "disable") await disableMix();
       else if (message.type === "speak") await playTts(message.audio);
       else if (message.type === "stop") stopTtsSources();
-      else if (message.type === "mode") setMode(message.mode);
+      else if (message.type === "volumes") setVolumes(message);
       else return;
       publishState(message.requestId);
     } catch (error) {

@@ -3,3 +3,5 @@ __pycache__/
 packet_env/
 frontend/node_modules
 .kombai/
+backend/data/user_profile.json
+backend/data/user_profile.tmp

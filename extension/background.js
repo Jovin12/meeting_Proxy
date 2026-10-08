@@ -126,6 +126,11 @@ async function openSocket(id) {
       return;
     }
 
+    if (msg.type === "user_profile_update") {
+      broadcastToSidePanel({ type: "user-profile-update", profile: msg.profile });
+      return;
+    }
+
     if (msg.error) {
       console.error("[bg] backend error", msg.error);
       broadcastToSidePanel({ type: "error", detail: msg.error });
