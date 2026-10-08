@@ -5,3 +5,6 @@ frontend/node_modules
 .kombai/
 backend/data/user_profile.json
 backend/data/user_profile.tmp
+backend/data/research_cache/
+backend/data/web_search_budget.json
+backend/data/web_search_budget.tmp

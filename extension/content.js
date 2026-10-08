@@ -308,6 +308,7 @@ function sendCaption(speaker, text) {
 // ----------------------------------------------------------------
 
 const rowState = new WeakMap();
+const lastCaptionTextBySpeaker = new Map();
 
 function scheduleEmit(row) {
   let state = rowState.get(row);
@@ -335,9 +336,17 @@ function scheduleEmit(row) {
       // (in practice this shouldn't happen)
     }
 
+    const previousSpeakerText = speaker ? lastCaptionTextBySpeaker.get(speaker) || "" : "";
+    const cumulativePrefix = [state.lastSent, previousSpeakerText]
+      .filter((previous) => previous && text.startsWith(previous))
+      .sort((a, b) => b.length - a.length)[0] || "";
+    const newText = (cumulativePrefix ? text.slice(cumulativePrefix.length) : text).trim();
     state.lastSent = text;
-    console.log("[content] caption:", speaker, "—", text);
-    sendCaption(speaker, text);
+    if (speaker) lastCaptionTextBySpeaker.set(speaker, text);
+    if (!newText) return;
+
+    console.log("[content] caption:", speaker, "—", newText);
+    sendCaption(speaker, newText);
   }, STABLE_MS);
 }
 
