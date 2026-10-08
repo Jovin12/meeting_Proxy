@@ -1024,5 +1024,52 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "91be0c41-ac99-4e0e-8cec-d1b9a27e1ed0",
+    "started_at": "2026-10-08T16:14:33.919853+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "91be0c41-ac99-4e0e-8cec-d1b9a27e1ed0",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:07",
+          "speaker": "You",
+          "text": "Hello, everyone! Let's get started."
+        },
+        {
+          "timestamp": "01:10",
+          "speaker": "You",
+          "text": "Jovin, what is the agenda for today?"
+        },
+        {
+          "timestamp": "02:02",
+          "speaker": "You",
+          "text": "I can review the options for vector store databases."
+        },
+        {
+          "timestamp": "02:13",
+          "speaker": "You",
+          "text": "All. Hello, everyone! Let's get started. Jovin, what is the agenda for today? I can review the options for vector store databases from my background as an AIML engineer and my current work on the meeting proxy project. I've completed reviews of several popular options, including elasticsearch face and annoy, however."
+        },
+        {
+          "timestamp": "02:22",
+          "speaker": "You",
+          "text": "All. Hello, everyone! Let's get started. Jovin, what is the agenda for today? I can review the options for vector store databases from my background as an AIML engineer and my current work on the meeting proxy project. I've completed reviews of several popular options, including elasticsearch face, and annoy. However, I'm still deciding which one to use based on our project. Specific needs and requirements. Can we discuss some key factors that influence this decision?"
+        },
+        {
+          "timestamp": "02:23",
+          "speaker": "You",
+          "text": "All. Hello, everyone! Let's get started. Jovin, what is the agenda for today? I can review the options for vector store databases from my background as an AIML engineer and my current work on the meeting proxy project. I've completed reviews of several popular options, including elasticsearch face, and annoy. However, I'm still deciding which one to use based on our Project's specific needs and requirements. Can we discuss some key factors that influence this decision?"
+        },
+        {
+          "timestamp": "03:01",
+          "speaker": "You",
+          "text": "For production level, which Vector store would be the best option?"
+        }
+      ],
+      "notes": []
+    }
   }
 ]

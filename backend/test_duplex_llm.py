@@ -1,7 +1,9 @@
 import asyncio
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from app import duplex_llm
 from app.duplex_llm import ConversationalBot
 from app.models import TranscriptEvent, UserProfile, UserTask, UserTaskStatus
 
@@ -58,6 +60,45 @@ class StaleStreamClient:
             yield SimpleNamespace(message=SimpleNamespace(content="response."))
 
         return chunks()
+
+
+class ResearchStreamingClient:
+    def __init__(self, final_response: str = "A concise researched answer."):
+        self.calls: list[dict] = []
+        self.final_response = final_response
+
+    async def chat(self, **kwargs):
+        self.calls.append(kwargs)
+        if kwargs.get("stream") is False:
+            return SimpleNamespace(
+                message=SimpleNamespace(content='{"query":"Qdrant versus FAISS scalability limits"}')
+            )
+
+        async def chunks():
+            yield SimpleNamespace(message=SimpleNamespace(content=self.final_response))
+
+        return chunks()
+
+
+class FakeResearchCache:
+    def __init__(self, matches: list[dict] | None = None):
+        self.matches = matches or []
+        self.cached: list[tuple[str, list[str]]] = []
+        self.profile = '{"name":"Jovin","tasks":[]}'
+        self.search_slots = 0
+
+    def search(self, query: str):
+        return self.matches
+
+    def get_profile(self):
+        return self.profile
+
+    def acquire_web_search_slot(self):
+        self.search_slots += 1
+        return True, ""
+
+    def cache_research(self, query: str, results: list[str]):
+        self.cached.append((query, results))
 
 
 class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
@@ -168,6 +209,201 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("return exactly NO_RESPONSE", system_prompt)
         self.assertIn("do not invent options, names, technical products, or placeholders", system_prompt)
         self.assertIn("say it has not been decided yet", system_prompt)
+        self.assertIn("Do not repeat a previous proposed reply", system_prompt)
+        self.assertIn("Never search for personal opinions or internal project decisions", system_prompt)
+
+    async def test_technical_question_checks_local_references_then_searches_generically(self):
+        client = ResearchStreamingClient()
+        research_cache = FakeResearchCache()
+        bot = self.make_bot(client)
+        bot.research_cache = research_cache
+        bot.update_user_profile(UserProfile(
+            name="Jovin",
+            background="Meeting Proxy project owner",
+        ))
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Alex",
+                text="What are the scalability limits of Qdrant compared to FAISS?",
+            ),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        with (
+            patch.object(duplex_llm, "find_local_references", return_value=["Local notes: no benchmark data."]) as local,
+            patch.object(duplex_llm, "search_web", return_value=["Benchmark results and documentation."]) as search,
+        ):
+            await bot.observe_transcript(callback)
+            await bot.generation_task
+
+        local.assert_called_once()
+        search.assert_called_once_with("Qdrant versus FAISS scalability limits")
+        self.assertEqual(research_cache.search_slots, 1)
+        self.assertEqual(len(research_cache.cached), 1)
+        planner_prompt = client.calls[0]["messages"][-1]["content"]
+        self.assertIn("RELEVANT CACHED RESEARCH OR LOCAL NOTES", planner_prompt)
+        self.assertIn("Jovin", planner_prompt)
+        final_context = client.calls[1]["messages"][-1]["content"]
+        self.assertIn("Benchmark results and documentation.", final_context)
+        self.assertIn("<web_research_snippets>", final_context)
+
+    async def test_technical_followup_uses_recent_topic_to_form_research_query(self):
+        client = ResearchStreamingClient()
+        research_cache = FakeResearchCache()
+        bot = self.make_bot(client)
+        bot.research_cache = research_cache
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:40",
+                speaker="Alex",
+                text="We are comparing Qdrant and FAISS for scalable vector search.",
+            ),
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Blair",
+                text="What about filtering?",
+            ),
+        ])
+        bot.active_request_id = "followup-research"
+
+        with (
+            patch.object(duplex_llm, "find_local_references", return_value=[]) as local,
+            patch.object(duplex_llm, "search_web", return_value=["Filtering documentation."]) as search,
+        ):
+            await bot._research_context("followup-research")
+
+        local.assert_called_once()
+        self.assertIn("Qdrant and FAISS", local.call_args.args[0])
+        search.assert_called_once()
+
+    async def test_relevant_cached_research_prevents_web_search(self):
+        client = ResearchStreamingClient()
+        research_cache = FakeResearchCache(matches=[{
+            "query": "Qdrant FAISS scalability",
+            "content": "Cached comparison: Qdrant is distributed; FAISS is embedded.",
+            "similarity": 0.84,
+        }])
+        bot = self.make_bot(client)
+        bot.research_cache = research_cache
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Alex",
+                text="What are the scalability limits of Qdrant compared to FAISS?",
+            ),
+        ])
+        bot.active_request_id = "cache-hit"
+
+        with (
+            patch.object(duplex_llm, "find_local_references") as local,
+            patch.object(duplex_llm, "search_web") as search,
+        ):
+            context = await bot._research_context("cache-hit")
+
+        local.assert_not_called()
+        search.assert_not_called()
+        self.assertEqual(client.calls, [])
+        self.assertIn("Cached comparison", context)
+        self.assertIn("Jovin", context)
+
+    async def test_failed_web_search_is_not_stored_as_cached_research(self):
+        client = ResearchStreamingClient()
+        research_cache = FakeResearchCache()
+        bot = self.make_bot(client)
+        bot.research_cache = research_cache
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Alex",
+                text="What are the scalability limits of Qdrant compared to FAISS?",
+            ),
+        ])
+        bot.active_request_id = "failed-search"
+
+        with (
+            patch.object(duplex_llm, "find_local_references", return_value=[]),
+            patch.object(duplex_llm, "search_web", side_effect=TimeoutError("timeout")),
+        ):
+            context = await bot._research_context("failed-search")
+
+        self.assertIn("could not be completed", context)
+        self.assertEqual(research_cache.cached, [])
+
+    async def test_nontechnical_question_does_not_start_research(self):
+        client = FakeStreamingClient([["We have not decided yet."]])
+        bot = self.make_bot(client)
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Alex",
+                text="Should we move the project meeting to Friday?",
+            ),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        with patch.object(duplex_llm, "search_web") as search:
+            await bot.observe_transcript(callback)
+            await bot.generation_task
+
+        search.assert_not_called()
+        self.assertEqual(len(client.calls), 1)
+
+    async def test_internal_technical_decision_uses_local_context_without_web_search(self):
+        client = ResearchStreamingClient()
+        bot = self.make_bot(client)
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:43",
+                speaker="Alex",
+                text="Should we choose Qdrant for our internal project? What do you think?",
+            ),
+        ])
+        bot.active_request_id = "internal-decision"
+
+        with (
+            patch.object(duplex_llm, "find_local_references", return_value=["Local decision note."]),
+            patch.object(duplex_llm, "search_web") as search,
+        ):
+            context = await bot._research_context("internal-decision")
+
+        search.assert_not_called()
+        self.assertEqual(client.calls, [])
+        self.assertIn("Local decision note.", context)
+        self.assertIn("<web_research_snippets>\n[]", context)
+
+    async def test_previous_proposal_is_retained_for_nonrepetition_until_transcript_resets(self):
+        client = FakeStreamingClient([["A concise answer."], ["A different answer."]])
+        bot = self.make_bot(client)
+        bot.update_transcript([
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text="What is the review date?"),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        await bot.observe_transcript(callback)
+        await bot.generation_task
+        bot.update_transcript([
+            *bot.state.transcript,
+            TranscriptEvent(timestamp="00:13", speaker="Blair", text="What about the review owner?"),
+        ])
+        await bot.observe_transcript(callback)
+        await bot.generation_task
+
+        self.assertIn("A concise answer.", client.calls[1]["messages"][-1]["content"])
+        self.assertIn("not confirmed spoken", client.calls[1]["messages"][-1]["content"])
+        bot.update_transcript([
+            TranscriptEvent(timestamp="00:01", speaker="Morgan", text="New meeting started."),
+        ])
+        self.assertEqual(bot.state.last_bot_response, "")
 
     async def test_skipped_reply_clears_previous_assistant_history(self):
         client = FakeStreamingClient([["Previous reply."], ["NO_RESPONSE"]])
@@ -194,9 +430,12 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         await bot.generation_task
 
         second_messages = client.calls[1]["messages"]
-        self.assertFalse(any(
-            "Previous reply." in message["content"] for message in second_messages
+        self.assertTrue(any(
+            "Previous reply." in message["content"]
+            and "not confirmed spoken" in message["content"]
+            for message in second_messages
         ))
+        self.assertFalse(any(message["role"] == "assistant" for message in second_messages))
         self.assertEqual(bot.state.recent_messages, [])
         self.assertEqual(bot.state.last_bot_response, "")
 
