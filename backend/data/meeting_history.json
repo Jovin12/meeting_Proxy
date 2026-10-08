@@ -770,5 +770,259 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "afc1c5ab-d3d9-4e3e-a5ea-88ba3fca69c6",
+    "started_at": "2026-10-08T14:25:48.899838+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "afc1c5ab-d3d9-4e3e-a5ea-88ba3fca69c6",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:29",
+          "speaker": "You",
+          "text": "Okay, let's get this meeting started. Jovin, can you start?"
+        },
+        {
+          "timestamp": "00:43",
+          "speaker": "You",
+          "text": "Okay, let's get this meeting started. Jovin, can you start? Hello, Jovin."
+        },
+        {
+          "timestamp": "00:50",
+          "speaker": "You",
+          "text": "Okay, let's get this meeting started. Jovin, can you start? Hello, Jovin. Jovin, Antony."
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "20d1a222-a4f4-4921-9365-c58409959405",
+    "started_at": "2026-10-08T14:32:21.485131+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "20d1a222-a4f4-4921-9365-c58409959405",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:32",
+          "speaker": "You",
+          "text": "Okay, hello, everybody. Let's get started, jovan. Start with you."
+        },
+        {
+          "timestamp": "00:33",
+          "speaker": "You",
+          "text": "Okay, hello, everybody. Let's get started. Jovin, start with you."
+        },
+        {
+          "timestamp": "01:42",
+          "speaker": "You",
+          "text": "Okay, hello, everybody. Let's get started. Jovin, start with you. Hello everyone! I'm jovin Antony, an AIML engineer currently working on the meeting proxy project for our discussion today. I'd like to briefly touch upon my ongoing task of selecting a vector store database. We've been exploring various options, but I haven't made a final."
+        },
+        {
+          "timestamp": "01:44",
+          "speaker": "You",
+          "text": "Okay, hello, everybody. Let's get started. Jovin, start with you. Hello everyone! I'm Jovin Antony, an AIML engineer currently working on the meeting proxy project for our discussion today. I'd like to briefly touch upon my ongoing task of selecting a vector store database. We've been exploring various options, but I haven't made a final."
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "fea189c1-c1bf-4263-b2a2-aa9978a7884e",
+    "started_at": "2026-10-08T14:42:47.115955+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "fea189c1-c1bf-4263-b2a2-aa9978a7884e",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:23",
+          "speaker": "You",
+          "text": "Okay, let's get started. Jovin, what's your situation? Okay, what's your situation? Jovin."
+        },
+        {
+          "timestamp": "01:43",
+          "speaker": "You",
+          "text": "Okay, let's get started. Jovin, what's your situation? Okay, what's your situation? Jovin. I'm still evaluating some options for our projects Vector Store database. We're currently exploring."
+        },
+        {
+          "timestamp": "01:46",
+          "speaker": "You",
+          "text": "Okay, let's get started. Jovin, what's your situation? Okay, what's your situation? Jovin. I'm still evaluating some options for our projects Vector store database. We're currently exploring. Okay, so."
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "ada5c0a4-de54-44f2-8ca4-00d6939f843a",
+    "started_at": "2026-10-08T14:51:15.057436+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "ada5c0a4-de54-44f2-8ca4-00d6939f843a",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:30",
+          "speaker": "You",
+          "text": "Okay, let's get started. What's our agenda here?"
+        },
+        {
+          "timestamp": "00:49",
+          "speaker": "You",
+          "text": "Okay, let's get started. What's our agenda here? What are options?"
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "b9128222-d284-4bf0-a8d7-33a3dd0c36b5",
+    "started_at": "2026-10-08T14:55:55.679651+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "b9128222-d284-4bf0-a8d7-33a3dd0c36b5",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:21",
+          "speaker": "You",
+          "text": "Okay, let's get started. What's our agenda for today?"
+        },
+        {
+          "timestamp": "00:32",
+          "speaker": "You",
+          "text": "Okay, let's get started. What's our agenda for today? Hello, Jovin."
+        },
+        {
+          "timestamp": "00:40",
+          "speaker": "You",
+          "text": "Okay, let's get started. What's our agenda for today? Hello, Jovin. And Jovin. What's our agenda for today?"
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "2b149665-e073-422d-9531-fd88e519fcb4",
+    "started_at": "2026-10-08T15:16:03.444959+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "2b149665-e073-422d-9531-fd88e519fcb4",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:13",
+          "speaker": "You",
+          "text": "Okay, let's get started."
+        },
+        {
+          "timestamp": "01:17",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today?"
+        },
+        {
+          "timestamp": "01:37",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today? Now, this is the first time."
+        },
+        {
+          "timestamp": "02:01",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today? Now, this is the first time. So, what Vector database is options? Do we have?"
+        },
+        {
+          "timestamp": "02:02",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today? Now, this is the first time. So, what Vector databases options do we have?"
+        },
+        {
+          "timestamp": "03:10",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today? Now, this is the first time. So, what Vector databases options do we have? I think there may be some repetition here as the meeting proxy. I'd like to clarify that I don't actually have an agenda to share since this is our first turn in the meeting."
+        },
+        {
+          "timestamp": "03:56",
+          "speaker": "You",
+          "text": "Okay, let's get started. Uh, Jovin, what's the agenda for today? Now, this is the first time. So, what Vector databases options do we have? I think there may be some repetition here as the meeting proxy. I'd like to clarify that I don't actually have an agenda to share. Since this is our first turn in the meeting, however, regarding the vector store database option, I can recall that we had a previous discussion about it from my background as an AIML engineer working on the meeting proxy project. I'm familiar with some popular options like anoy face and pytorch IO. We could discuss these options further to determine which one might be best suited for our project needs. If you'd like to move forward, we can take a closer look at each options, features, performance, and potential trade-offs. I'm open to hearing your thoughts and opinions on the matter."
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "7802fc35-e2ea-4c85-a983-077dce8d6269",
+    "started_at": "2026-10-08T15:23:06.921979+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "7802fc35-e2ea-4c85-a983-077dce8d6269",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:43",
+          "speaker": "You",
+          "text": "Hello, everyone! Let's get started."
+        },
+        {
+          "timestamp": "00:47",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Joven, what is it that we need to discuss today?"
+        },
+        {
+          "timestamp": "00:48",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today?"
+        },
+        {
+          "timestamp": "01:17",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database."
+        },
+        {
+          "timestamp": "01:43",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have?"
+        },
+        {
+          "timestamp": "02:35",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it."
+        },
+        {
+          "timestamp": "03:58",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have?"
+        },
+        {
+          "timestamp": "04:01",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have? And can they be scaled to a production environment easily?"
+        },
+        {
+          "timestamp": "04:47",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have? And can they be scaled to a production environment easily? I'm here for the meeting proxy project discussion. We were discussing choosing a vectorstore database. Our task is currently."
+        },
+        {
+          "timestamp": "04:57",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have? And can they be scaled to a production environment easily? I'm here for the meeting proxy project discussion. We were discussing choosing a vectorstore database. Our task is currently Vector database review in progress. I've reviewed some options like Face and Annoy, but haven't finalized my choice yet due to still deciding on which one to use for our project."
+        },
+        {
+          "timestamp": "04:58",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have? And can they be scaled to a production environment easily? I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Our task is currently Vector database review in progress. I've reviewed some options like face and anoy, but haven't finalized my choice yet due to still deciding on which one to use for our project."
+        },
+        {
+          "timestamp": "05:22",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is it that we need to discuss today? Hello, I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Okay, what Vector store databases options do we have? Yes, but what options do we have to choose from? As our AI engineer, you should be able to answer it. Okay, what benefits do each of them have? And can they be scaled to a production environment easily? I'm here for the meeting proxy project discussion. We were discussing choosing a vector store database. Our task is currently Vector database review in progress. I've reviewed some options like face and anoy, but haven't finalized my choice yet due to still deciding on which one to use for our project. But you are not telling me why I would pick any of the vector stores you mentioned. You gave me the options, but not the reason for using them."
+        }
+      ],
+      "notes": []
+    }
   }
 ]

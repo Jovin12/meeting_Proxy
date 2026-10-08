@@ -9,6 +9,27 @@ class NoteStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class UserTaskStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class UserTask(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    status: UserTaskStatus = UserTaskStatus.NOT_STARTED
+
+
+class ActiveTaskUpdates(BaseModel):
+    tasks: list[UserTask] = Field(default_factory=list, max_length=8)
+
+
+class UserProfile(BaseModel):
+    name: str = Field(default="", max_length=120)
+    background: str = Field(default="", max_length=5000)
+    tasks: list[UserTask] = Field(default_factory=list)
+
+
 class NoteAnalysis(BaseModel):
     status: NoteStatus
     evidence: str
@@ -51,7 +72,11 @@ class NotesUpdateRequest(BaseModel):
 
 
 class SuggestedQuestions(BaseModel):
-    questions: list[str] = Field(min_length=3, max_length=3)
+    questions: list[str] = Field(
+        min_length=0,
+        max_length=3,
+        description="Three suggestions, or an empty list while waiting for other speakers.",
+    )
 
 
 class MeetingState(BaseModel):

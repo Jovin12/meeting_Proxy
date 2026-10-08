@@ -1,5 +1,7 @@
 import asyncio
 import json
+import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,7 +13,13 @@ from uuid import uuid4
 
 from .matcher import load_notes, load_transcript
 from .retriever import TranscriptRetriever
-from .llm import classify_note, suggest_questions
+from .llm import (
+    classify_note,
+    extract_active_task_updates,
+    merge_active_task_updates,
+    suggest_questions,
+    transcript_for_question_suggestions,
+)
 from .models import (
     Note,
     NoteStatus,
@@ -22,6 +30,7 @@ from .models import (
     TranscriptEvent,
     MeetingState,
     SuggestedQuestions,
+    UserProfile,
 )
 from .state_engine import MeetingStateEngine
 from .duplex_llm import ConversationalBot
@@ -29,6 +38,7 @@ from .duplex_llm import ConversationalBot
 from .basictts import robotic_tts
 
 app = FastAPI(title="Meeting Proxy")
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +55,30 @@ meeting_engines: dict[str, MeetingStateEngine] = {}
 conversational_engines: dict[str, ConversationalBot] = {}
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 HISTORY_PATH = DATA_DIR / "meeting_history.json"
+USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
+active_task_memory_lock = asyncio.Lock()
+active_task_extraction_semaphore = asyncio.Semaphore(1)
+active_task_update_jobs: set[asyncio.Task[None]] = set()
+
+
+def _load_user_profile() -> UserProfile:
+    try:
+        with USER_PROFILE_PATH.open("r", encoding="utf-8") as profile_file:
+            return UserProfile.model_validate(json.load(profile_file))
+    except FileNotFoundError:
+        return UserProfile()
+
+
+def _persist_user_profile(profile: UserProfile) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path = USER_PROFILE_PATH.with_suffix(".tmp")
+    with temporary_path.open("w", encoding="utf-8") as profile_file:
+        profile_file.write(profile.model_dump_json(indent=2))
+        profile_file.write("\n")
+    temporary_path.replace(USER_PROFILE_PATH)
+
+
+user_profile = _load_user_profile()
 
 
 def _load_history() -> list[dict]:
@@ -97,6 +131,67 @@ def _latest_engine() -> MeetingStateEngine:
         )
     meeting_id = next(reversed(meeting_engines))
     return meeting_engines[meeting_id]
+
+
+@app.get("/user-profile", response_model=UserProfile)
+def get_user_profile():
+    return user_profile
+
+
+@app.put("/user-profile", response_model=UserProfile)
+async def update_user_profile(profile: UserProfile):
+    global user_profile
+    async with active_task_memory_lock:
+        updated_profile = profile.model_copy(deep=True)
+        await run_in_threadpool(_persist_user_profile, updated_profile)
+        user_profile = updated_profile
+        for conversational_engine in conversational_engines.values():
+            conversational_engine.update_user_profile(updated_profile)
+        return updated_profile
+
+
+async def _update_active_task_memory(event: TranscriptEvent) -> UserProfile | None:
+    global user_profile
+    async with active_task_extraction_semaphore:
+        profile_snapshot = user_profile.model_copy(deep=True)
+        updates = await run_in_threadpool(
+            extract_active_task_updates,
+            event,
+            profile_snapshot,
+        )
+
+    async with active_task_memory_lock:
+        updated_profile = merge_active_task_updates(user_profile, updates)
+        if updated_profile.tasks == user_profile.tasks:
+            return None
+
+        await run_in_threadpool(_persist_user_profile, updated_profile)
+        user_profile = updated_profile
+        for conversational_engine in conversational_engines.values():
+            conversational_engine.update_user_profile(updated_profile)
+        return updated_profile
+
+
+def _schedule_active_task_update(
+    event: TranscriptEvent,
+    notify: Callable[[dict], Awaitable[None]] | None = None,
+) -> None:
+    async def update_and_notify() -> None:
+        try:
+            profile = await _update_active_task_memory(event)
+            if profile is not None and notify is not None:
+                await notify({
+                    "type": "user_profile_update",
+                    "profile": profile.model_dump(mode="json"),
+                })
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Could not update active task memory from meeting caption")
+
+    task = asyncio.create_task(update_and_notify())
+    active_task_update_jobs.add(task)
+    task.add_done_callback(active_task_update_jobs.discard)
 
 
 async def _interrupt_conversation(meeting_id: str) -> None:
@@ -162,7 +257,7 @@ def start_meeting(request: MeetingStartRequest | None = None):
         notes=notes,
         retriever=TranscriptRetriever(),
     )
-    conversational_engines[meeting_id] = ConversationalBot()
+    conversational_engines[meeting_id] = ConversationalBot(user_profile=user_profile)
 
     state = meeting_engines[meeting_id].get_state()
     meeting_history.append({
@@ -219,12 +314,13 @@ def get_saved_meeting(meeting_id: str):
 # --------------------------------------------------
 
 @app.post("/meeting/event")
-def add_meeting_event_flat(event: TranscriptEvent):
+async def add_meeting_event_flat(event: TranscriptEvent):
     engine = _latest_engine()
     if not engine.state.active:
         raise HTTPException(400, "Meeting has already ended.")
-    state = engine.add_event(event)
+    state = await run_in_threadpool(engine.add_event, event)
     conversational_engines[state.meeting_id].update_transcript(state.transcript)
+    _schedule_active_task_update(event)
     return state
 
 
@@ -247,12 +343,13 @@ async def end_meeting_flat():
 # --------------------------------------------------
 
 @app.post("/meeting/{meeting_id}/event")
-def add_meeting_event(meeting_id: str, event: TranscriptEvent):
+async def add_meeting_event(meeting_id: str, event: TranscriptEvent):
     engine = _get_engine(meeting_id)
     if not engine.state.active:
         raise HTTPException(400, "Meeting has already ended.")
-    state = engine.add_event(event)
+    state = await run_in_threadpool(engine.add_event, event)
     conversational_engines[meeting_id].update_transcript(state.transcript)
+    _schedule_active_task_update(event)
     return state
 
 
@@ -288,12 +385,11 @@ async def get_suggested_questions(meeting_id: str):
     if not transcript:
         raise HTTPException(400, "No transcript is available for question suggestions.")
 
-    transcript_text = "\n".join(
-        f"[{event.timestamp}] {event.speaker or 'Unknown'}: {event.text}"
-        for event in transcript
-    )
+    transcript_text = transcript_for_question_suggestions(transcript, user_profile.name)
+    if not transcript_text:
+        return SuggestedQuestions(questions=[])
     try:
-        return await run_in_threadpool(suggest_questions, transcript_text)
+        return await run_in_threadpool(suggest_questions, transcript_text, user_profile)
     except ValueError as error:
         raise HTTPException(502, str(error)) from error
 
@@ -332,7 +428,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
     conversational_engine = conversational_engines.get(meeting_id)
     if conversational_engine is None:
-        conversational_engine = ConversationalBot()
+        conversational_engine = ConversationalBot(user_profile=user_profile)
         conversational_engines[meeting_id] = conversational_engine
     conversational_engine.update_transcript(engine.state.transcript)
 
@@ -343,6 +439,12 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
             await websocket.send_json(payload)
 
     async def send_conversation_event(payload: dict) -> None:
+        try:
+            await send_payload(payload)
+        except (RuntimeError, WebSocketDisconnect):
+            return
+
+    async def send_profile_update(payload: dict) -> None:
         try:
             await send_payload(payload)
         except (RuntimeError, WebSocketDisconnect):
@@ -373,6 +475,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
                 await send_payload(state.model_dump(mode="json"))
                 await conversational_engine.observe_transcript(send_conversation_event)
+                _schedule_active_task_update(event, send_profile_update)
 
             elif msg_type == "conversation_interrupt":
                 await conversational_engine.interrupt(send_conversation_event)
