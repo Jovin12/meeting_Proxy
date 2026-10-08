@@ -34,7 +34,6 @@ from .models import (
 )
 from .state_engine import MeetingStateEngine
 from .duplex_llm import ConversationalBot
-from .research import ResearchCache
 
 from .basictts import robotic_tts
 
@@ -57,7 +56,6 @@ conversational_engines: dict[str, ConversationalBot] = {}
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 HISTORY_PATH = DATA_DIR / "meeting_history.json"
 USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
-research_cache = ResearchCache(DATA_DIR / "research_cache", retriever.model)
 active_task_memory_lock = asyncio.Lock()
 active_task_extraction_semaphore = asyncio.Semaphore(1)
 active_task_update_jobs: set[asyncio.Task[None]] = set()
@@ -81,7 +79,6 @@ def _persist_user_profile(profile: UserProfile) -> None:
 
 
 user_profile = _load_user_profile()
-research_cache.update_profile(user_profile)
 
 
 def _load_history() -> list[dict]:
@@ -147,7 +144,6 @@ async def update_user_profile(profile: UserProfile):
     async with active_task_memory_lock:
         updated_profile = profile.model_copy(deep=True)
         await run_in_threadpool(_persist_user_profile, updated_profile)
-        await run_in_threadpool(research_cache.update_profile, updated_profile)
         user_profile = updated_profile
         for conversational_engine in conversational_engines.values():
             conversational_engine.update_user_profile(updated_profile)
@@ -170,7 +166,6 @@ async def _update_active_task_memory(event: TranscriptEvent) -> UserProfile | No
             return None
 
         await run_in_threadpool(_persist_user_profile, updated_profile)
-        await run_in_threadpool(research_cache.update_profile, updated_profile)
         user_profile = updated_profile
         for conversational_engine in conversational_engines.values():
             conversational_engine.update_user_profile(updated_profile)
@@ -262,10 +257,7 @@ def start_meeting(request: MeetingStartRequest | None = None):
         notes=notes,
         retriever=TranscriptRetriever(),
     )
-    conversational_engines[meeting_id] = ConversationalBot(
-        user_profile=user_profile,
-        research_cache=research_cache,
-    )
+    conversational_engines[meeting_id] = ConversationalBot(user_profile=user_profile)
 
     state = meeting_engines[meeting_id].get_state()
     meeting_history.append({
@@ -436,10 +428,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
 
     conversational_engine = conversational_engines.get(meeting_id)
     if conversational_engine is None:
-        conversational_engine = ConversationalBot(
-            user_profile=user_profile,
-            research_cache=research_cache,
-        )
+        conversational_engine = ConversationalBot(user_profile=user_profile)
         conversational_engines[meeting_id] = conversational_engine
     conversational_engine.update_transcript(engine.state.transcript)
 

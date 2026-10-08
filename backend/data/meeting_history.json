@@ -1071,5 +1071,47 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "e4a97dec-e6c3-4f29-8d9f-866f3e5e988d",
+    "started_at": "2026-10-08T16:48:25.568399+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "e4a97dec-e6c3-4f29-8d9f-866f3e5e988d",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:41",
+          "speaker": "You",
+          "text": "Hello, everyone! Let's get started."
+        },
+        {
+          "timestamp": "00:44",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Joven, what is the reason for this meeting?"
+        },
+        {
+          "timestamp": "00:45",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for this meeting?"
+        },
+        {
+          "timestamp": "01:43",
+          "speaker": "You",
+          "text": "Okay, what options for the data store do we have if we are working with millions of entries and need to scale it to a production level code base?"
+        },
+        {
+          "timestamp": "02:03",
+          "speaker": "You",
+          "text": "I am currently working on deciding which Vector store database to use."
+        },
+        {
+          "timestamp": "02:23",
+          "speaker": "You",
+          "text": "Okay, which options for the vector store database? Are you considering?"
+        }
+      ],
+      "notes": []
+    }
   }
 ]

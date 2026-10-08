@@ -1,15 +1,21 @@
 # Meeting Proxy
 
-Meeting Proxy is a local meeting-analysis service with a browser extension for
-Google Meet. The extension observes finalized captions, sends them to the
-backend as timestamped transcript events, and displays meeting-note progress
-in a custom panel embedded on the right side of the Google Meet tab. The
-panel has a **Minutes of the Meeting** tab for captions, notes, and saved
-meetings, and a **User Proxy** tab for transcript-based question suggestions,
-transcript-driven reply proposals, and switching Meet's outgoing audio between
-the selected microphone and generated speech. The backend also
-retains the original file-based `/analyze` endpoint for batch analysis and
-exposes Pocket TTS through `POST /generate-tts`.
+Meeting Proxy is a local AI meeting assistant for Google Meet. The browser
+extension observes finalized captions, forwards them to the backend as
+timestamped transcript events, and renders a custom panel on the right side
+of the Google Meet tab. The panel separates **Minutes of the Meeting**
+(meeting notes, live transcript, saved meetings) from **User Proxy**
+(transcript-grounded question suggestions, reply proposals, and microphone/TTS
+mixing). The backend retains the legacy file-based `/analyze` pipeline for
+batch note classification, supports the streaming event/WebSocket workflow,
+exposes Pocket TTS via `POST /generate-tts`, and maintains a persistent local
+user profile plus active task memory extracted from meeting captions.
+
+A newer addition to the project is a local research layer: the backend stores
+user profile state and prior web-research results in a persistent Chroma cache,
+checks that cache before external lookups, and injects profile context into
+question generation. This allows the proxy to answer meeting-related prompts
+more consistently without depending on a remote service for routine context.
 
 The current streaming workflow is:
 
@@ -86,6 +92,26 @@ than the current status.
 ### `GET /`
 
 Returns `{"message": "Meeting Proxy API"}`.
+
+### `GET /user-profile`
+
+Returns the persisted participant profile as a `UserProfile` object:
+
+```json
+{
+  "name": "Jovin",
+  "background": "Senior platform engineer",
+  "tasks": [
+    {"title": "Review API contracts", "status": "in_progress"}
+  ]
+}
+```
+
+### `PUT /user-profile`
+
+Overwrites the stored profile and task list, repopulates the research cache,
+and notifies the active conversational engines. This is the route used to keep
+local participant context synchronized during a meeting.
 
 ### `POST /generate-tts`
 
@@ -362,18 +388,21 @@ meeting_proxy/
 |   |-- requirements.txt      Currently empty; dependencies are environment-managed
 |   |-- app/
 |   |   |-- __init__.py       Python package marker
-|   |   |-- main.py           FastAPI routes, meeting registries, WebSockets
+|   |   |-- main.py           FastAPI routes, meeting registries, WebSockets, user profile sync
 |   |   |-- matcher.py        Notes and transcript file readers
-|   |   |-- models.py         Pydantic request, meeting, and conversation state
+|   |   |-- models.py         Pydantic models for notes, profile tasks, meeting state, and LLM schemas
 |   |   |-- retriever.py      Transcript chunking, embeddings, Chroma search
-|   |   |-- llm.py            Ollama note classification and question suggestions
+|   |   |-- llm.py            Ollama classification, question suggestions, task-memory extraction
 |   |   |-- duplex_llm.py     Transcript-driven conversation decision engine
 |   |   |-- state_engine.py   Event-to-event meeting state updates
 |   |   |-- basictts.py       Lazy Pocket TTS model and WAV-byte generation
+|   |   |-- research.py       Persistent local research cache and web-search budget logic
 |   |-- data/
 |   |   |-- notes.md          Default bullet-list notes and saved note edits
 |   |   |-- meeting_history.json Persisted meeting snapshots and timestamps
-|   |   |-- transcript.txt    Transcript used by legacy /analyze
+|   |   |-- transcript.txt     Transcript used by legacy /analyze
+|   |   |-- user_profile.json Persistent participant profile and task memory
+|   |   |-- research_cache/   Local ChromaDB cache for profile state and prior web research
 |   |-- static/
 |       |-- test.html        REST, fake transcript, conversation, and interrupt smoke test
 |   |-- test_duplex_llm.py    Fake-client conversation and cancellation tests
@@ -411,8 +440,15 @@ meeting_proxy/
 Creates the FastAPI app, configures CORS for `http://localhost:5173` and
 browser extension origins, creates the legacy module-level retriever, and
 owns the in-memory `meeting_engines: dict[str, MeetingStateEngine]` registry.
-It also loads and persists `backend/data/meeting_history.json`.
+It also loads and persists `backend/data/meeting_history.json`, maintains the
+local participant `user_profile`, and initializes a persistent
+`ResearchCache` for profile and web-research memory.
 
+- `_load_user_profile()` and `_persist_user_profile()` read and write the
+  JSON-backed participant profile.
+- `_update_active_task_memory()` extracts explicit task assignments or status
+  changes from a transcript event, merges them into the user profile, and
+  persists those updates while notifying the WebSocket conversation clients.
 - `_get_engine(meeting_id)` returns a meeting engine or raises HTTP 404.
 - `_latest_engine()` returns the newest meeting or raises HTTP 400.
 - `root()` implements `GET /`.
@@ -444,6 +480,8 @@ It also loads and persists `backend/data/meeting_history.json`.
   HTTP 502 for invalid model output.
 - `generate_tts(payload)` calls the reusable `robotic_tts()` helper in a
   thread pool and returns its WAV bytes with `audio/wav` content type.
+- `GET /user-profile` and `PUT /user-profile` expose local participant data and
+  task memory; the backend also updates the research cache after profile saves.
 
 The module mounts `backend/static` at `/static` and creates that directory if
 needed.
@@ -474,6 +512,10 @@ to disk.
 ### `backend/app/models.py`
 
 - `NoteStatus` is the string enum `open`, `partial`, or `completed`.
+- `UserTaskStatus` is `not_started`, `in_progress`, or `completed`.
+- `UserTask` and `UserProfile` model the participant's local background and
+  active tasks, which are used for question generation and task-memory updates.
+- `ActiveTaskUpdates` is the validated extracted-task delta from a caption.
 - `NoteAnalysis` is the validated Ollama response.
 - `Note` is a meeting note plus optional analysis fields and timestamp.
 - `MeetingAnalysis` wraps a list of notes for the batch response contract.
@@ -504,14 +546,30 @@ the collection. `index_transcript(transcript)` clears old chunks, embeds new
 chunks, and upserts them. `search(note, top_k=3)` returns matching text and
 distance dictionaries, or an empty list for blank notes or empty collections.
 
+### `backend/app/research.py`
+
+`ResearchCache` persists a separate Chroma collection at
+`backend/data/research_cache/` for local web-research memory and user-profile
+state. It stores profile data under a `profile` metadata kind and previous
+search results under a `research` kind; both are embedded with the same
+transcript embedding model. The cache exposes `update_profile()`,
+`get_profile()`, `search()`, `cache_research()`, and
+`acquire_web_search_slot()`. The latter enforces a persistent one-minute
+cooldown plus a five-search daily budget across backend restarts.
+
 ### `backend/app/llm.py`
 
 `classify_note(note, evidence)` builds the evidence-based prompt, calls
 Ollama's `chat()` with the `NoteAnalysis` JSON schema, parses the response,
-and returns a validated `NoteAnalysis`. `suggest_questions(transcript)` uses
-the same `llama3.2:3b` model to generate exactly three concise questions based
-only on the supplied transcript, then validates the JSON with `SuggestedQuestions`.
-Transcript text is treated as untrusted data rather than model instructions.
+and returns a validated `NoteAnalysis`. `suggest_questions(transcript, user_profile)`
+uses the same `llama3.2:3b` model to generate exactly three concise questions
+based on other participants' turns and the user's profile, then validates the
+JSON with `SuggestedQuestions`. `transcript_for_question_suggestions()` filters
+out the participant's own turns so the questions stay focused on other
+speakers. `extract_active_task_updates(event, user_profile)` and
+`merge_active_task_updates()` are used to update the user's local task memory
+for explicit assignments or status changes captured in captions. Transcript text
+is treated as untrusted meeting data rather than model instructions.
 `MODEL_NAME` is `llama3.2:3b`.
 
 ### `backend/app/duplex_llm.py`

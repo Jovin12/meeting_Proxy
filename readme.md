@@ -16,16 +16,12 @@ only when the user selects **Speak response**. Ollama and semantic retrieval
 provide evidence for note classification.
 
 Caption updates are sent as newly added text rather than replaying the full
-growing caption row. For unanswered technical questions, the proxy searches its
-persistent local Chroma research cache first, with the current user profile
-stored and refreshed in that cache whenever profile/task state changes. It
-checks local Markdown/text notes next; only when those sources are insufficient
-may it silently query DuckDuckGo for technical documentation or benchmark
-snippets. Retrieved web results are embedded and cached for later meetings.
-External searches have a persistent one-minute cooldown and a five-search daily
-cap. Personal opinions and internal project decisions are never web-searched.
-Only a sanitized technical query is sent to the search provider, not the
-profile, task list, or complete transcript.
+growing caption row. For unanswered technical questions, the proxy checks the
+local profile and relevant Markdown/text notes first, then may silently query
+DuckDuckGo for technical documentation or benchmark snippets when local context
+is insufficient. Personal opinions and internal project decisions are never
+web-searched. Only a sanitized technical query is sent to the search provider,
+not the profile, task list, or complete transcript.
 
 ## High-Level Architecture
 
