@@ -1113,5 +1113,42 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "0d34b3c0-aa0c-4873-89dd-e3fdecb5caf8",
+    "started_at": "2026-10-08T16:53:21.397868+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "0d34b3c0-aa0c-4873-89dd-e3fdecb5caf8",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:33",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. What is the purpose of this meeting?"
+        },
+        {
+          "timestamp": "02:09",
+          "speaker": "You",
+          "text": "We're here to discuss our current project, which involves implementing a meeting proxy system. I'd like to start by reviewing our previous discussion on vectorstore databases and ensure we're aligned on our options for moving forward."
+        },
+        {
+          "timestamp": "02:10",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. What is the purpose of this meeting? We're here to discuss our current project, which involves implementing a meeting proxy system. I'd like to start by reviewing our previous discussion on vector store databases and ensure we're aligned on our options for moving forward."
+        },
+        {
+          "timestamp": "02:20",
+          "speaker": "You",
+          "text": "Okay, great. Which options are we considering?"
+        },
+        {
+          "timestamp": "03:00",
+          "speaker": "You",
+          "text": "I'm considering the options we discussed previously, but it seems like our previous discussion was cut off. Could someone summarize what we were looking at or provide more context on the vector store database options. I'd like to make sure we're aligned before proceeding."
+        }
+      ],
+      "notes": []
+    }
   }
 ]
