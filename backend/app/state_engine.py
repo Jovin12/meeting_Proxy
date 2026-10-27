@@ -75,40 +75,37 @@ class MeetingStateEngine:
         if not self.state.active:
             raise ValueError("Meeting is no longer active.")
 
-        # Add the new transcript event
-        self.state.transcript.append(event)
+        existing_index = next(
+            (
+                index
+                for index, existing in enumerate(self.state.transcript)
+                if event.utterance_id is not None
+                and existing.utterance_id == event.utterance_id
+            ),
+            None,
+        )
+        if existing_index is None:
+            self.state.transcript.append(event)
+        else:
+            self.state.transcript[existing_index] = event
 
-        # Build transcript from all events
         transcript = "\n".join(
             f"[{item.timestamp}] {item.speaker}: {item.text}"
             for item in self.state.transcript
         )
 
-        # Re-index the transcript
         self.retriever.index_transcript(transcript)
 
-        # Analyze each note
         for note in self.state.notes:
-
-            # Completed notes are done — don't re-classify.
             if note.status == NoteStatus.COMPLETED:
                 continue
 
-            evidence = self.retriever.search(
-                note.text,
-                top_k=3,
-            )
+            evidence = self.retriever.search(note.text, top_k=3)
+            analysis = classify_note(note.text, evidence)
 
-            analysis = classify_note(
-                note.text,
-                evidence,
-            )
-
-            # Never regress to a weaker status.
             if _STATUS_RANK[analysis.status] < _STATUS_RANK[note.status]:
                 continue
 
-            # Update note with LLM analysis
             note.status = analysis.status
             note.evidence = analysis.evidence
             note.confidence = analysis.confidence

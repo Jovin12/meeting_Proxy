@@ -57,6 +57,7 @@ class TranscriptEvent(BaseModel):
     timestamp: str
     speaker: str | None = None
     text: str
+    utterance_id: str | None = None
 
 
 class MeetingStartRequest(BaseModel):

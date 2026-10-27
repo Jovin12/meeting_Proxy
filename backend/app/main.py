@@ -466,6 +466,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
                     timestamp=payload["timestamp"],
                     speaker=payload.get("speaker"),
                     text=payload["text"],
+                    utterance_id=payload.get("utterance_id"),
                 )
 
                 # add_event does embeddings + LLM call — keep the loop unblocked.
