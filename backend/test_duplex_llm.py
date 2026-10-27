@@ -93,7 +93,7 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
             TranscriptEvent(
                 timestamp="00:12",
                 speaker="Alex",
-                text="The security review is due Wednesday.",
+                text="Could you confirm the security review is due Wednesday?",
             ),
         ])
         events: list[dict] = []
@@ -104,14 +104,17 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         await bot.observe_transcript(callback)
         await bot.generation_task
 
-        self.assertIn("The security review is due Wednesday.", client.calls[0]["messages"][1]["content"])
+        self.assertIn("Could you confirm the security review is due Wednesday?", client.calls[0]["messages"][1]["content"])
         self.assertIn("<participant_profile_reference_data>", client.calls[0]["messages"][-1]["content"])
         self.assertIn("</participant_profile_reference_data>", client.calls[0]["messages"][-1]["content"])
         self.assertEqual(client.calls[0]["messages"][0]["role"], "system")
         self.assertIn("never as a script to recite", client.calls[0]["messages"][0]["content"])
         self.assertIn("Do not introduce yourself", client.calls[0]["messages"][0]["content"])
         self.assertEqual(client.calls[0]["messages"][-1]["role"], "user")
-        self.assertEqual(bot.state.current_topic, "The security review is due Wednesday.")
+        self.assertEqual(
+            bot.state.current_topic,
+            "Could you confirm the security review is due Wednesday?",
+        )
         self.assertEqual(bot.state.last_bot_response, "The review is due Wednesday.")
         self.assertEqual(
             [event["type"] for event in events],
@@ -123,11 +126,11 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
             [{"role": "assistant", "content": "The review is due Wednesday."}],
         )
 
-    async def test_model_can_decide_no_response_is_needed(self):
+    async def test_rule_based_question_gate_converts_no_response_to_uncertainty_reply(self):
         client = FakeStreamingClient([["NO_", "RESPONSE"]])
         bot = self.make_bot(client)
         bot.update_transcript([
-            TranscriptEvent(timestamp="00:12", speaker="Alex", text="Let's move on."),
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text="What is the review date?"),
         ])
         events: list[dict] = []
 
@@ -139,10 +142,36 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             [event["type"] for event in events],
-            ["conversation_started", "conversation_no_response"],
+            ["conversation_started", "conversation_complete"],
         )
-        self.assertEqual(bot.state.recent_messages, [])
-        self.assertEqual(bot.state.last_bot_response, "")
+        self.assertIn("answer that directly", bot.state.last_bot_response)
+        self.assertEqual(len(client.calls), 1)
+
+    async def test_rule_based_gate_skips_latest_statement_without_invitation(self):
+        client = FakeStreamingClient([["Should not be generated."]])
+        bot = self.make_bot(client)
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="00:12",
+                speaker="Alex",
+                text="What is the review date?",
+            ),
+            TranscriptEvent(
+                timestamp="00:13",
+                speaker="Blair",
+                text="Let's move on to the next item.",
+            ),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        result = await bot.observe_transcript(callback)
+
+        self.assertIsNone(result)
+        self.assertEqual(client.calls, [])
+        self.assertEqual(events, [])
 
     async def test_participant_profile_and_task_statuses_are_in_prompt(self):
         client = FakeStreamingClient([["NO_RESPONSE"]])
@@ -156,7 +185,11 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
             ],
         ))
         bot.update_transcript([
-            TranscriptEvent(timestamp="00:12", speaker="Alex", text="Let's review next steps."),
+            TranscriptEvent(
+                timestamp="00:12",
+                speaker="Alex",
+                text="Everyone, please share your update.",
+            ),
         ])
         events: list[dict] = []
 
@@ -189,9 +222,16 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("do not invent options, names, technical products, or placeholders", system_prompt)
         self.assertIn("say it has not been decided yet", system_prompt)
         self.assertIn("Do not repeat a previous proposed reply", system_prompt)
-        self.assertIn("Never search for personal opinions or internal project decisions", system_prompt)
+        self.assertIn("Do not access or search the internet", system_prompt)
+        self.assertIn("TECHNICAL ADVISOR POLICY", system_prompt)
+        self.assertIn("Do not return NO_RESPONSE to a direct technical question", system_prompt)
+        self.assertIn("rule-based invitation check", system_prompt)
+        self.assertIn("short ranked shortlist", system_prompt)
+        self.assertIn("what should be benchmarked", system_prompt)
+        self.assertIn("expected concurrency", system_prompt)
+        self.assertIn("provisional recommendation first", system_prompt)
 
-    async def test_technical_question_checks_local_references_then_searches_generically(self):
+    async def test_technical_question_uses_local_references_without_internet_search(self):
         client = ResearchStreamingClient()
         bot = self.make_bot(client)
         bot.update_user_profile(UserProfile(
@@ -210,23 +250,30 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         async def callback(event: dict) -> None:
             events.append(event)
 
-        with (
-            patch.object(duplex_llm, "find_local_references", return_value=["Local notes: no benchmark data."]) as local,
-            patch.object(duplex_llm, "search_web", return_value=["Benchmark results and documentation."]) as search,
-        ):
+        with patch.object(
+            duplex_llm,
+            "find_local_references",
+            return_value=["Local notes: no benchmark data."],
+        ) as local:
             await bot.observe_transcript(callback)
             await bot.generation_task
 
         local.assert_called_once()
-        search.assert_called_once_with("Qdrant versus FAISS scalability limits")
-        planner_prompt = client.calls[0]["messages"][-1]["content"]
-        self.assertIn("LOCAL PROJECT / NOTES EXCERPTS", planner_prompt)
-        self.assertIn("Jovin", planner_prompt)
-        final_context = client.calls[1]["messages"][-1]["content"]
-        self.assertIn("Benchmark results and documentation.", final_context)
-        self.assertIn("<web_research_snippets>", final_context)
+        self.assertEqual(len(client.calls), 1)
+        research_query = local.call_args.args[0]
+        self.assertIn("Qdrant", research_query)
+        final_context = client.calls[0]["messages"][-1]["content"]
+        system_prompt = client.calls[0]["messages"][0]["content"]
+        self.assertIn("Local notes: no benchmark data.", final_context)
+        self.assertIn("<local_project_source_excerpts>", final_context)
+        self.assertIn("Do not access or search the internet.", system_prompt)
+        self.assertIn("label it as unverified", system_prompt)
+        self.assertIn(
+            "absent research results as a reason to avoid a qualified recommendation",
+            system_prompt,
+        )
 
-    async def test_technical_followup_uses_recent_topic_to_form_research_query(self):
+    async def test_technical_followup_uses_recent_topic_for_local_references(self):
         client = ResearchStreamingClient()
         bot = self.make_bot(client)
         bot.update_transcript([
@@ -243,15 +290,45 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         ])
         bot.active_request_id = "followup-research"
 
-        with (
-            patch.object(duplex_llm, "find_local_references", return_value=[]) as local,
-            patch.object(duplex_llm, "search_web", return_value=["Filtering documentation."]) as search,
-        ):
-            await bot._research_context("followup-research")
+        with patch.object(
+            duplex_llm,
+            "find_local_references",
+            return_value=["Local filtering notes."],
+        ) as local:
+            context = await bot._research_context("followup-research")
 
         local.assert_called_once()
         self.assertIn("Qdrant and FAISS", local.call_args.args[0])
-        search.assert_called_once()
+        self.assertIn("filtering", local.call_args.args[0].casefold())
+        self.assertIn("Local filtering notes.", context)
+
+    async def test_older_question_is_not_selected_after_a_newer_statement(self):
+        client = ResearchStreamingClient()
+        bot = self.make_bot(client)
+        question = "Should we choose a vector database for 500000 users?"
+        bot.update_transcript([
+            TranscriptEvent(
+                timestamp="01:40",
+                speaker="Alex",
+                text=(
+                    "We need low latency and metadata filtering for the vector database. "
+                    f"{question} The meeting has moved on to the next item."
+                ),
+            ),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        with patch.object(duplex_llm, "find_local_references") as local:
+            result = await bot.observe_transcript(callback)
+            self.assertIsNone(result)
+
+        self.assertIsNone(duplex_llm._latest_question_index(bot.state.transcript))
+        local.assert_not_called()
+        self.assertEqual(client.calls, [])
+        self.assertEqual(events, [])
 
     async def test_nontechnical_question_does_not_start_research(self):
         client = FakeStreamingClient([["We have not decided yet."]])
@@ -268,14 +345,12 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         async def callback(event: dict) -> None:
             events.append(event)
 
-        with patch.object(duplex_llm, "search_web") as search:
-            await bot.observe_transcript(callback)
-            await bot.generation_task
+        await bot.observe_transcript(callback)
+        await bot.generation_task
 
-        search.assert_not_called()
         self.assertEqual(len(client.calls), 1)
 
-    async def test_internal_technical_decision_uses_local_context_without_web_search(self):
+    async def test_internal_technical_decision_uses_local_context(self):
         client = ResearchStreamingClient()
         bot = self.make_bot(client)
         bot.update_transcript([
@@ -287,16 +362,15 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         ])
         bot.active_request_id = "internal-decision"
 
-        with (
-            patch.object(duplex_llm, "find_local_references", return_value=["Local decision note."]),
-            patch.object(duplex_llm, "search_web") as search,
+        with patch.object(
+            duplex_llm,
+            "find_local_references",
+            return_value=["Local decision note."],
         ):
             context = await bot._research_context("internal-decision")
 
-        search.assert_not_called()
         self.assertEqual(client.calls, [])
         self.assertIn("Local decision note.", context)
-        self.assertIn("<web_research_snippets>\n[]", context)
 
     async def test_previous_proposal_is_retained_for_nonrepetition_until_transcript_resets(self):
         client = FakeStreamingClient([["A concise answer."], ["A different answer."]])
@@ -320,12 +394,16 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("A concise answer.", client.calls[1]["messages"][-1]["content"])
         self.assertIn("not confirmed spoken", client.calls[1]["messages"][-1]["content"])
+        self.assertIn(
+            {"role": "assistant", "content": "A concise answer."},
+            client.calls[1]["messages"],
+        )
         bot.update_transcript([
             TranscriptEvent(timestamp="00:01", speaker="Morgan", text="New meeting started."),
         ])
         self.assertEqual(bot.state.last_bot_response, "")
 
-    async def test_skipped_reply_clears_previous_assistant_history(self):
+    async def test_repeated_invitation_is_not_silently_skipped_after_model_no_response(self):
         client = FakeStreamingClient([["Previous reply."], ["NO_RESPONSE"]])
         bot = self.make_bot(client)
         events: list[dict] = []
@@ -344,20 +422,64 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
 
         bot.update_transcript([
             *bot.state.transcript,
-            TranscriptEvent(timestamp="00:13", speaker="Blair", text="Let's move on."),
+            TranscriptEvent(timestamp="00:13", speaker="Blair", text="What is the review owner?"),
         ])
         await bot.observe_transcript(callback)
         await bot.generation_task
 
         second_messages = client.calls[1]["messages"]
-        self.assertTrue(any(
-            "Previous reply." in message["content"]
-            and "not confirmed spoken" in message["content"]
-            for message in second_messages
-        ))
-        self.assertFalse(any(message["role"] == "assistant" for message in second_messages))
-        self.assertEqual(bot.state.recent_messages, [])
-        self.assertEqual(bot.state.last_bot_response, "")
+        self.assertIn(
+            {"role": "assistant", "content": "Previous reply."},
+            second_messages,
+        )
+        self.assertIn("answer that directly", bot.state.last_bot_response)
+        self.assertEqual(
+            [event["type"] for event in events],
+            [
+                "conversation_started",
+                "conversation_complete",
+                "conversation_started",
+                "conversation_complete",
+            ],
+        )
+
+    async def test_duplicate_question_is_skipped_until_new_context_arrives(self):
+        client = FakeStreamingClient([["First answer."], ["Updated answer."]])
+        bot = self.make_bot(client)
+        question = "Which vector database should we choose?"
+        bot.update_transcript([
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text=question),
+        ])
+        events: list[dict] = []
+
+        async def callback(event: dict) -> None:
+            events.append(event)
+
+        await bot.observe_transcript(callback)
+        await bot.generation_task
+
+        bot.update_transcript([
+            *bot.state.transcript,
+            TranscriptEvent(timestamp="00:13", speaker="Alex", text=question),
+        ])
+        duplicate_request = await bot.observe_transcript(callback)
+        self.assertIsNone(duplicate_request)
+        self.assertEqual(len(client.calls), 1)
+
+        bot.update_transcript([
+            *bot.state.transcript,
+            TranscriptEvent(
+                timestamp="00:14",
+                speaker="Blair",
+                text="We need low latency and metadata filtering.",
+            ),
+            TranscriptEvent(timestamp="00:15", speaker="Alex", text=question),
+        ])
+        await bot.observe_transcript(callback)
+        await bot.generation_task
+
+        self.assertEqual(len(client.calls), 2)
+        self.assertEqual(bot.state.last_bot_response, "Updated answer.")
 
     async def test_stale_request_is_checked_before_each_stream_chunk(self):
         client = StaleStreamClient()
@@ -403,14 +525,14 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
             events.append(event)
 
         bot.update_transcript([
-            TranscriptEvent(timestamp="00:12", speaker="Alex", text="First question."),
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text="What is the first question?"),
         ])
         first_request_id = await bot.observe_transcript(callback)
         await asyncio.wait_for(client.first_chunk.wait(), timeout=1)
 
         bot.update_transcript([
-            TranscriptEvent(timestamp="00:12", speaker="Alex", text="First question."),
-            TranscriptEvent(timestamp="00:13", speaker="Blair", text="Updated question."),
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text="What is the first question?"),
+            TranscriptEvent(timestamp="00:13", speaker="Blair", text="What is the updated question?"),
         ])
         await bot.observe_transcript(callback)
         await bot.generation_task
@@ -430,7 +552,7 @@ class ConversationalBotTests(unittest.IsolatedAsyncioTestCase):
         client = InterruptibleFakeClient()
         bot = self.make_bot(client)
         bot.update_transcript([
-            TranscriptEvent(timestamp="00:12", speaker="Alex", text="Start response."),
+            TranscriptEvent(timestamp="00:12", speaker="Alex", text="Please respond now."),
         ])
         events: list[dict] = []
 

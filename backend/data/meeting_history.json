@@ -1150,5 +1150,244 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "577f430d-a44d-4b0e-bdc3-dc86659c9cf9",
+    "started_at": "2026-10-27T14:33:47.645333+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "577f430d-a44d-4b0e-bdc3-dc86659c9cf9",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "02:48",
+          "speaker": "You",
+          "text": "Hello, everyone! Let's get started."
+        },
+        {
+          "timestamp": "02:51",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the goal for today's meeting?"
+        },
+        {
+          "timestamp": "03:15",
+          "speaker": "You",
+          "text": "We're here to discuss Vector store database options for our current project, and I'd like to provide an update on my progress with the task database Benchmark review, as it's currently ongoing."
+        },
+        {
+          "timestamp": "04:36",
+          "speaker": "You",
+          "text": "Given that we have a user base of 500 000, which Vector store database do you suggest we go with to have reduced latency for all the users?"
+        },
+        {
+          "timestamp": "05:42",
+          "speaker": "You",
+          "text": "Yes, but which Vector store do you suggest we use as our AIML engineer? You should know this."
+        },
+        {
+          "timestamp": "06:43",
+          "speaker": "You",
+          "text": "We want to Target low latency."
+        },
+        {
+          "timestamp": "06:50",
+          "speaker": "You",
+          "text": "Trying to do?"
+        },
+        {
+          "timestamp": "07:06",
+          "speaker": "You",
+          "text": "We want to Target low latency."
+        },
+        {
+          "timestamp": "07:07",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the goal for today's meeting? We're here to discuss Vector store database options for our current project, and I'd like to provide an update on my progress with the task database Benchmark review, as it's currently ongoing. Given that we have a user base of 500 000, which Vector store database do you suggest we go with to have reduced latency for all the users? Yes, but which Vector store do you suggest we use as our AIML engineer? You should know this. We want to Target low latency. We want to Target low latency."
+        },
+        {
+          "timestamp": "07:38",
+          "speaker": "You",
+          "text": "We want to Target low latency. So, which Vector store do you suggest we go with?"
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "ab64d5bc-e79c-42c5-8f23-c37a0805fe53",
+    "started_at": "2026-10-27T15:19:17.149216+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "ab64d5bc-e79c-42c5-8f23-c37a0805fe53",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:46",
+          "speaker": "You",
+          "text": "Hello, everyone! Let's get started."
+        },
+        {
+          "timestamp": "00:50",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting?"
+        },
+        {
+          "timestamp": "01:26",
+          "speaker": "You",
+          "text": "I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process."
+        },
+        {
+          "timestamp": "02:40",
+          "speaker": "You",
+          "text": "Okay, given that we have."
+        },
+        {
+          "timestamp": "02:47",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use?"
+        },
+        {
+          "timestamp": "03:56",
+          "speaker": "You",
+          "text": "Okay, but that is too much information."
+        },
+        {
+          "timestamp": "04:00",
+          "speaker": "You",
+          "text": "Why would I even need rag? Why not just use the elm on its own?"
+        },
+        {
+          "timestamp": "04:01",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own?"
+        },
+        {
+          "timestamp": "05:04",
+          "speaker": "You",
+          "text": "I see that we've discussed using LM language model as a potential solution, however."
+        },
+        {
+          "timestamp": "05:33",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While lm can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with lm. That would make it a better fit for our Vector store solution."
+        },
+        {
+          "timestamp": "05:34",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution."
+        },
+        {
+          "timestamp": "06:40",
+          "speaker": "You",
+          "text": "For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is Rag even needed?"
+        },
+        {
+          "timestamp": "06:41",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed?"
+        },
+        {
+          "timestamp": "07:53",
+          "speaker": "You",
+          "text": "Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed?"
+        },
+        {
+          "timestamp": "08:38",
+          "speaker": "You",
+          "text": "Another."
+        },
+        {
+          "timestamp": "08:43",
+          "speaker": "You",
+          "text": "Que."
+        },
+        {
+          "timestamp": "08:47",
+          "speaker": "You",
+          "text": "And we are a punta."
+        },
+        {
+          "timestamp": "08:51",
+          "speaker": "You",
+          "text": "Okay."
+        },
+        {
+          "timestamp": "09:44",
+          "speaker": "You",
+          "text": "Public."
+        },
+        {
+          "timestamp": "10:26",
+          "speaker": "You",
+          "text": "Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed?"
+        },
+        {
+          "timestamp": "10:27",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?"
+        },
+        {
+          "timestamp": "11:29",
+          "speaker": "You",
+          "text": "I feel like rag or with the use of vector databases unnecessary, so."
+        },
+        {
+          "timestamp": "11:32",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed?"
+        },
+        {
+          "timestamp": "11:44",
+          "speaker": "You",
+          "text": "I am asking you jovin. Why is rag needed and in conjunction? Why is a vector database needed?"
+        },
+        {
+          "timestamp": "11:45",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed?"
+        },
+        {
+          "timestamp": "14:43",
+          "speaker": "You",
+          "text": "Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chos."
+        },
+        {
+          "timestamp": "14:57",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2."
+        },
+        {
+          "timestamp": "15:05",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt."
+        },
+        {
+          "timestamp": "15:07",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt R as?"
+        },
+        {
+          "timestamp": "15:28",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt, R. As for line in F user profile to parse the user profile data from the file data. User profiles append user profile. Create the index to find similar profiles. Deafquiry user profile query encode the query into a vector query Vector encode query search for similar vectors in the index D I index search query Vector."
+        },
+        {
+          "timestamp": "15:34",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt, R. As for line in F user profile to parse the user profile data from the file data. User profiles append user profile. Create the index to find similar profiles. Deafquiry user profile query. Encode the query into a vector query Vector encode query. Search for similar vectors in the index D I index. Search query Vector K10 return the top 10 most similar user profiles return user profiles."
+        },
+        {
+          "timestamp": "16:08",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt, R, as for line and F user profile to parse the user profile data from the file date. User profiles append user profile. Create the index to find similar profiles. Devquery user profile query. Encode the query into a vector query Vector in code query. Search for similar vectors in the index D I index. Search query Vector K10 return the top 10 most similar user profiles. Return user profiles Define a function to encode a user profile into a vectordefin code user profile. Into a numerical representation. Return NP array vectorized data. Test the query function query. What is the meaning of life result? Query user profile query print result. This code demonstrates a simple example of how a vector database could be used to search for similar user profiles based on their text data. However, this is just a rough outline and would need to be adapted and refined to meet the specific requirements of the meeting proxy project."
+        },
+        {
+          "timestamp": "16:09",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to discuss the current status of our Vector store database options and how they align with my ongoing work on the meeting proxy project. Specifically, I've completed reviewing several databases and would like to present some insights to help inform our decision-making process. Okay, given that we have 500,000 users and low latency is a requirement. What Vector store database do you suggest we use? Okay, but that is too much information. Why would I even need rag? Why not just use the LM on its own? I see that we've discussed using LM language model as a potential solution. However, I'd like to clarify that our current requirement is for low latency and handling a large user population of 500, 000 users. Considering this face seems like a more suitable option for us, given its focus on efficient similarity search and clustering of dense vectors. While LM can provide some benefits in terms of language understanding, it might not be the most efficient choice for our specific use case. Can I ask, what is the main goal you're trying to achieve with LM. That would make it a better fit for our Vector store solution. For the meeting proxy project, we are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector databases unnecessary. So why is rag even needed? Another. Que. And we are a punta. Okay. Public. Forget about the 500k users and low latency for the meeting proxy project. We are discussing which Vector database to use, but so far, I feel like rag or with the use of vector database is unnecessary. So why is rag even needed?  I feel like rag or with the use of vector database is unnecessary. So, why is rag even needed? I am asking you Jovin. Why is rag needed and in conjunction? Why is a vector database needed? Based on the provided text, it appears that there is a meeting proxy project that uses a conversational AI model to generate transcript, grounded question, suggestions, and observe live conversations to propose replies. The project also uses a local research layer to store user profile state in a persistent cache and retrieve relevant local project documentation. For technical questions, the question of whether a vector database is needed seems to be unclear with Joven expressing uncertainty about its necessity. However, it can be inferred that the Project's requirements are focused on low latency and efficient similarity search, which suggests that a suitable Vector database could be beneficial. Some possible options for Vector databases that could meet these requirements include an open source Vector database, like face or Annoy, a cloud-based Vector database like AWS sagemaker or Google Cloud AI platform, a proprietary Vector database from a vendor like Microsoft or IBM. In order to determine the most suitable option, it would be necessary to consider factors, such as data size and complexity, query patterns, and performance requirements addition. Carefully considered to ensure that the chosen solution meets the Project's needs. Here is some sample code that demonstrates how a simple Vector database could be used in the meeting proxy project import face. Initialize the face index index index face index flat L2 128. Load the user profile data into the index user profiles with open user profiles txt, R, as for line and F user profile to parse the user profile data from the file date. User profiles append user profile. Create the index to find similar profiles. Devquery user profile query. Encode the query into a vector query Vector in code query. Search for similar vectors in the index D I index. Search query Vector K10 return the top 10 most similar user profiles. Return user profiles Define a function to encode a user profile into a vectordefin code user profile. Into a numerical representation. Return NP array, vectorize data test, the query function query. What is the meaning of life result? Query user profile query print result. This code demonstrates a simple example of how a vector database could be used to search for similar user profiles based on their text data. However, this is just a rough outline and would need to be adapted and refined to meet the specific requirements of the meeting proxy project."
+        }
+      ],
+      "notes": []
+    }
   }
 ]

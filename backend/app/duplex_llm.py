@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
@@ -10,54 +11,116 @@ from uuid import uuid4
 from ollama import AsyncClient
 
 from .models import ConversationalState, TranscriptEvent, UserProfile
-from .research import (
-    ResearchPlan,
-    find_local_references,
-    query_terms,
-    sanitize_web_query,
-    search_web,
-)
+from .research import build_research_query, find_local_references
 
 MODEL_NAME = "llama3.2:3b"
 NO_RESPONSE = "NO_RESPONSE"
 ConversationCallback = Callable[[dict[str, Any]], Awaitable[None]]
 MAX_RECENT_MESSAGES = 12
 OBSERVATION_DEBOUNCE_SECONDS = 1.0
+LOG_RESEARCH_CONTENT = os.getenv("MEETING_PROXY_LOG_RESEARCH_CONTENT") == "1"
 logger = logging.getLogger(__name__)
 _QUESTION_START = re.compile(
     r"^\s*(how|what|why|when|where|which|who|can|could|would|do|does|"
     r"is|are|compare|explain|describe)\b",
     re.IGNORECASE,
 )
+_INVITATION = re.compile(
+    r"\b(?:please\s+)?(?:tell|share|give|provide|explain|describe|recommend|"
+    r"suggest|answer|introduce|update|report|weigh in|respond|reply|speak)\b"
+    r".{0,100}\b(?:you|your|us|everyone|each|team|yourself|yourselves)\b"
+    r"|\b(?:please\s+(?:answer|respond|reply|speak)|introduce yourself|"
+    r"introduce yourselves|share your (?:update|status|opinion|thoughts)|"
+    r"give us your (?:update|status|opinion|thoughts)|tell us your "
+    r"(?:update|status|opinion|thoughts)|everyone.{0,60}"
+    r"(?:share|give|provide|introduce)|let's go around and introduce "
+    r"ourselves)\b",
+    re.IGNORECASE,
+)
 _TECHNICAL_TERMS = re.compile(
-    r"\b(api|benchmark|database|embedding|faiss|framework|index|inference|"
-    r"latency|library|model|performance|protocol|python|qdrant|scalability|"
-    r"scale|server|throughput|vector|version|cache|concurrency|architecture)\b",
+    r"\b(api|benchmark|database|embedding|faiss|filter(?:ing)?|framework|index|"
+    r"inference|latency|library|model|performance|protocol|python|qdrant|"
+    r"scalability|scale|server|throughput|vector|version|cache|concurrency|"
+    r"architecture)\b",
     re.IGNORECASE,
 )
-_SUBJECTIVE_OR_INTERNAL = re.compile(
-    r"\b(should we|should i|what do you think|do you think|your opinion|"
-    r"personal opinion|do you prefer|would you choose|which should we|"
-    r"what should we choose|what should i choose|internal project|our project|"
-    r"our decision|we need to decide)\b",
-    re.IGNORECASE,
-)
-
-
 def _format_research_context(
     local_references: list[str],
-    web_results: list[str] | None = None,
-    search_failure: str = "",
 ) -> str:
     return (
-        "\n\n<local_research_excerpts>\n"
+        "\n\n<local_project_source_excerpts>\n"
         f"{json.dumps(local_references, ensure_ascii=False)}\n"
-        "</local_research_excerpts>\n"
-        "<web_research_snippets>\n"
-        f"{json.dumps(web_results or [], ensure_ascii=False)}\n"
-        "</web_research_snippets>\n"
-        f"{search_failure}"
+        "</local_project_source_excerpts>\n"
     )
+
+
+def _is_question(text: str) -> bool:
+    return "?" in text or _QUESTION_START.match(text) is not None
+
+
+def _sentence_fragments(text: str) -> list[str]:
+    return [
+        fragment.strip()
+        for fragment in re.split(r"(?<=[.!?])\s+", text.strip())
+        if fragment.strip()
+    ]
+
+
+def _latest_turn_text(event: TranscriptEvent) -> str:
+    fragments = _sentence_fragments(event.text)
+    return fragments[-1] if fragments else ""
+
+
+def _latest_question_index(transcript: Sequence[TranscriptEvent]) -> int | None:
+    for index in range(len(transcript) - 1, -1, -1):
+        text = _latest_turn_text(transcript[index])
+        if text:
+            return index if _is_question(text) else None
+    return None
+
+
+def _turn_key(event: TranscriptEvent) -> tuple[str, str]:
+    normalized_text = " ".join(
+        re.findall(r"[a-z0-9]+", _latest_turn_text(event).casefold())
+    )
+    return (event.speaker.strip().casefold() if event.speaker else "", normalized_text)
+
+
+def _context_keys(
+    transcript: Sequence[TranscriptEvent],
+    current_turn_key: tuple[str, str],
+) -> set[tuple[str, str]]:
+    keys: set[tuple[str, str]] = set()
+    for event in transcript:
+        speaker = event.speaker.strip().casefold() if event.speaker else ""
+        for fragment in _sentence_fragments(event.text):
+            normalized_text = " ".join(re.findall(r"[a-z0-9]+", fragment.casefold()))
+            key = (speaker, normalized_text)
+            if normalized_text and key != current_turn_key:
+                keys.add(key)
+    return keys
+
+
+def _has_meaningful_new_context(
+    transcript: Sequence[TranscriptEvent],
+    previous_context: set[tuple[str, str]],
+    current_turn_key: tuple[str, str],
+) -> bool:
+    for event in transcript:
+        speaker = event.speaker.strip().casefold() if event.speaker else ""
+        for fragment in _sentence_fragments(event.text):
+            normalized_text = " ".join(re.findall(r"[a-z0-9]+", fragment.casefold()))
+            key = (speaker, normalized_text)
+            if key == current_turn_key or key in previous_context:
+                continue
+            if len(re.findall(r"[A-Za-z0-9+#.-]{3,}", fragment)) >= 3:
+                return True
+    return False
+
+
+def _is_direct_invitation(event: TranscriptEvent) -> bool:
+    text = _latest_turn_text(event)
+    return bool(text and (_is_question(text) or _INVITATION.search(text)))
 
 
 class ConversationalBot:
@@ -75,6 +138,10 @@ class ConversationalBot:
         self.active_request_id: str | None = None
         self.is_generating = False
         self.observation_debounce_seconds = OBSERVATION_DEBOUNCE_SECONDS
+        self.active_turn_key: tuple[str, str] | None = None
+        self.active_turn_context: set[tuple[str, str]] = set()
+        self.last_handled_turn_key: tuple[str, str] | None = None
+        self.last_handled_context: set[tuple[str, str]] = set()
 
     def update_transcript(self, transcript: Sequence[TranscriptEvent]) -> None:
         updated_transcript = [event.model_copy() for event in transcript]
@@ -88,6 +155,8 @@ class ConversationalBot:
         ):
             self.state.recent_messages.clear()
             self.state.last_bot_response = ""
+            self.last_handled_turn_key = None
+            self.last_handled_context.clear()
         self.state.transcript = updated_transcript
         self.state.current_topic = next(
             (event.text.strip()[:240] for event in reversed(self.state.transcript) if event.text.strip()),
@@ -107,11 +176,18 @@ class ConversationalBot:
         )
         profile = self.user_profile.model_dump_json(indent=2)
         previous_reply = self.state.last_bot_response or "(No previous proposed reply.)"
+        latest_question_index = _latest_question_index(self.state.transcript)
+        latest_question = (
+            _latest_turn_text(self.state.transcript[latest_question_index])
+            if latest_question_index is not None
+            else "(The latest transcript turn is not a question.)"
+        )
         context = (
             f"<participant_profile_reference_data>\n{profile}\n"
             f"</participant_profile_reference_data>\n\n"
             f"PREVIOUS PROPOSED REPLY (not confirmed spoken):\n{previous_reply}\n\n"
             f"CURRENT MEETING TOPIC / LATEST TRANSCRIPT TURN:\n{self.state.current_topic}\n\n"
+            f"LATEST QUESTION OR INVITATION:\n{latest_question}\n\n"
             f"MEETING TRANSCRIPT SO FAR:\n{transcript or '(No meeting transcript yet.)'}"
             f"{research_context}"
         )
@@ -172,10 +248,29 @@ class ConversationalBot:
                     "proposed reply unless someone explicitly asks you to repeat or clarify it. "
                     "If facts are unavailable, say what you cannot verify and ask one concise "
                     "clarifying question when useful; do not recycle an unrelated previous answer. "
-                    "Use provided web snippets only for requested technical facts, library "
-                    "documentation, or benchmarks when local references do not answer the "
-                    "question. Never search for personal opinions or internal project decisions. "
-                    "Do not quote snippets verbatim or say 'according to the internet'."
+                    "Do not access or search the internet. Use only the transcript, participant "
+                    "profile, provided local research excerpts, and general technical knowledge. "
+                    "If available sources do not establish a fact, label it as unverified rather "
+                    "than presenting it as certain. "
+                    "TECHNICAL ADVISOR POLICY: When a participant asks for a technical "
+                    "recommendation, answer as the represented participant using sound engineering "
+                    "judgment. Clearly distinguish project facts documented in the transcript or "
+                    "local source excerpts, provisional recommendations based on general technical "
+                    "knowledge, and assumptions that still require validation. If no local source "
+                    "supports a project-specific claim, say so; do not treat absent research "
+                    "results as a reason to avoid a qualified recommendation. Do not require the team to have already "
+                    "selected options before recommending one. When asked which technology to "
+                    "choose, give a suitable candidate or short ranked shortlist, briefly explain "
+                    "trade-offs, and state what should be benchmarked. Apply stated requirements; "
+                    "for low latency and large user populations, consider expected concurrency, "
+                    "data volume, filtering needs, deployment, availability, and operational cost. "
+                    "Do not assume user count alone determines the best database. Ask a clarifying "
+                    "question only when missing information materially changes the recommendation; "
+                    "when possible, give a provisional recommendation first. Do not return "
+                    "NO_RESPONSE to a direct technical question merely because the team has not "
+                    "made a decision. A rule-based invitation check has identified the latest "
+                    "transcript turn as a direct question or explicit invitation; provide a "
+                    "proposed reply rather than returning NO_RESPONSE."
                 ),
             },
             *self.state.recent_messages,
@@ -183,13 +278,37 @@ class ConversationalBot:
         ]
 
     async def observe_transcript(self, callback: ConversationCallback) -> str | None:
-        if not any(event.text.strip() for event in self.state.transcript):
+        latest_event = next(
+            (event for event in reversed(self.state.transcript) if event.text.strip()),
+            None,
+        )
+        if latest_event is None or not _is_direct_invitation(latest_event):
+            await self.interrupt(callback)
+            logger.debug("Conversation skipped: latest transcript turn is not an invitation.")
+            return None
+
+        turn_key = _turn_key(latest_event)
+        context_keys = _context_keys(self.state.transcript, turn_key)
+        if (
+            self.generation_task is not None
+            and self.active_request_id
+            and self.active_turn_key == turn_key
+            and self.active_turn_context == context_keys
+        ):
+            return self.active_request_id
+        if self.last_handled_turn_key == turn_key and not _has_meaningful_new_context(
+            self.state.transcript,
+            self.last_handled_context,
+            turn_key,
+        ):
+            logger.debug("Conversation skipped: invitation was already handled.")
             return None
 
         await self.interrupt(callback)
-        self.state.recent_messages.clear()
         request_id = str(uuid4())
         self.active_request_id = request_id
+        self.active_turn_key = turn_key
+        self.active_turn_context = context_keys
         self.is_generating = True
         await callback({
             "type": "conversation_started",
@@ -203,16 +322,30 @@ class ConversationalBot:
 
     async def _research_context(self, request_id: str) -> str:
         if not self.state.transcript:
+            logger.debug("Research lookup skipped: transcript is empty.")
             return ""
-        question = self.state.transcript[-1].text.strip()
-        research_material = "\n".join(
-            event.text for event in self.state.transcript[-4:]
+        question_index = _latest_question_index(self.state.transcript)
+        if question_index is None:
+            logger.debug("Research lookup skipped: no question identified.")
+            return ""
+        question = _latest_turn_text(self.state.transcript[question_index])
+        conversation_context = [
+            fragment
+            for event in self.state.transcript
+            for fragment in _sentence_fragments(event.text)
+            if fragment.casefold() != question.casefold()
+        ]
+        research_material = build_research_query(
+            question,
+            conversation_context,
         )
-        if not question or (
-            "?" not in question and not _QUESTION_START.match(question)
-        ):
-            return ""
         if not _TECHNICAL_TERMS.search(research_material):
+            logger.debug(
+                "Research lookup skipped: selected_question=%s reason=no_technical_terms.",
+                bool(question),
+            )
+            if LOG_RESEARCH_CONTENT:
+                logger.debug("Selected research question: %s", question)
             return ""
 
         local_references = await asyncio.to_thread(
@@ -220,88 +353,21 @@ class ConversationalBot:
             research_material,
             Path(__file__).resolve().parents[2],
         )
-        if request_id != self.active_request_id:
-            return ""
-        if _SUBJECTIVE_OR_INTERNAL.search(question):
-            return _format_research_context(local_references)
-
-        meeting_transcript = "\n".join(
-            f"{event.speaker or 'Unknown'}: {event.text}"
-            for event in self.state.transcript
+        logger.debug(
+            "Research lookup completed: selected_question=%s references=%d.",
+            bool(question),
+            len(local_references),
         )
-
-        planning_prompt = (
-            "Decide if web research is needed for the newest meeting question. "
-            "Return a concise search query only for objective technical facts, "
-            "library documentation, or benchmarks that are not answered by the "
-            "local profile, transcript, or excerpts. Return an empty query for "
-            "opinions, preferences, internal project decisions, non-technical "
-            "requests, or questions already answered locally. Keep any query "
-            "generic: never include participant names, profile details, project "
-            "names, or private meeting content.\n\n"
-            "Return exactly one JSON object with a required string field named "
-            '"query". Use an empty string when no search is appropriate. For example, '
-            '{"query":"Qdrant FAISS scalability benchmarks"}.\n\n'
-            f"LOCAL PARTICIPANT PROFILE:\n"
-            f"{self.user_profile.model_dump_json(indent=2)}\n\n"
-            f"LOCAL PROJECT / NOTES EXCERPTS:\n"
-            f"{json.dumps(local_references, ensure_ascii=False)}\n\n"
-            f"MEETING TRANSCRIPT FOR CONTEXT:\n{meeting_transcript}\n\n"
-            f"NEWEST MEETING TURN:\n{question}"
-        )
-        plan_response = await self.client.chat(
-            model=self.model_name,
-            messages=[{
-                "role": "system",
-                "content": (
-                    "Classify research need conservatively. Always return the required "
-                    'JSON field, for example {"query":""} or '
-                    '{"query":"Qdrant FAISS scalability benchmarks"}.'
-                ),
-            }, {
-                "role": "user",
-                "content": planning_prompt,
-            }],
-            format=ResearchPlan.model_json_schema(),
-            stream=False,
-        )
-        plan = ResearchPlan.model_validate_json(plan_response.message.content)
-        if request_id != self.active_request_id:
-            return ""
-        if not (query_terms(research_material) & query_terms(plan.query)):
-            return _format_research_context(local_references)
-
-        web_results: list[str] = []
-        search_failure = ""
-        workspace_name = Path(__file__).resolve().parents[2].name
-        private_values = [
-            self.user_profile.name,
-            self.user_profile.background,
-            *(task.title for task in self.user_profile.tasks),
-            workspace_name,
-            workspace_name.replace("_", " "),
-        ]
-        for private_value in (
-            self.user_profile.background,
-            *(task.title for task in self.user_profile.tasks),
-        ):
-            private_values.extend(
-                re.findall(r"\b[A-Z][A-Za-z0-9_-]{2,}\b", private_value)
+        if LOG_RESEARCH_CONTENT:
+            logger.debug(
+                "Research question and retrieved excerpts: question=%r excerpts=%r",
+                question,
+                local_references,
             )
-        web_query = sanitize_web_query(plan.query, private_values)
-        if web_query:
-            try:
-                web_results = await asyncio.to_thread(search_web, web_query)
-            except (TimeoutError, OSError) as error:
-                logger.warning("Technical web research failed: %s", error)
-                search_failure = (
-                    "Web research could not be completed. Do not imply that "
-                    "the answer was verified by a search."
-                )
         if request_id != self.active_request_id:
             return ""
 
-        return _format_research_context(local_references, web_results, search_failure)
+        return _format_research_context(local_references)
 
     async def interrupt(self, callback: ConversationCallback | None = None) -> None:
         task = self.generation_task
@@ -311,6 +377,8 @@ class ConversationalBot:
 
         self.generation_task = None
         self.active_request_id = None
+        self.active_turn_key = None
+        self.active_turn_context.clear()
         self.is_generating = False
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
@@ -352,6 +420,7 @@ class ConversationalBot:
 
             response = "".join(response_parts).strip()
             if not response:
+                logger.debug("Conversation response category: empty.")
                 await callback({
                     "type": "conversation_error",
                     "request_id": request_id,
@@ -359,15 +428,37 @@ class ConversationalBot:
                 })
                 return
             if response == NO_RESPONSE:
-                self.state.recent_messages.clear()
-                self.state.last_bot_response = ""
-                await callback({
-                    "type": "conversation_no_response",
-                    "request_id": request_id,
-                    "current_topic": self.state.current_topic,
-                })
+                logger.warning(
+                    "Model returned NO_RESPONSE for a rule-based direct invitation; "
+                    "using an explicit uncertainty reply."
+                )
+                response = (
+                    "I should answer that directly, but I don't have enough information "
+                    "in the transcript or local sources to give a reliable answer yet."
+                )
+                logger.debug("Conversation response category: forced_uncertainty_reply.")
+            else:
+                logger.debug("Conversation response category: proposed_reply.")
+
+            if request_id != self.active_request_id:
                 return
 
+            active_turn_key = self.active_turn_key
+            if active_turn_key is not None:
+                self.last_handled_turn_key = active_turn_key
+            latest_event = next(
+                (event for event in reversed(self.state.transcript) if event.text.strip()),
+                None,
+            )
+            if (
+                active_turn_key is not None
+                and latest_event is not None
+                and _turn_key(latest_event) == active_turn_key
+            ):
+                self.last_handled_context = _context_keys(
+                    self.state.transcript,
+                    active_turn_key,
+                )
             self.state.last_bot_response = response
             self.state.recent_messages.append({
                 "role": "assistant",
