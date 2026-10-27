@@ -1389,5 +1389,23 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "c0131fc8-ddfa-4f9a-9323-54e727a0c12a",
+    "started_at": "2026-10-27T15:54:46.767280+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "c0131fc8-ddfa-4f9a-9323-54e727a0c12a",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "06:10",
+          "speaker": "You",
+          "text": "Hello everyone, let's get started. Jovin, what is the reason for today's meeting? I'd like to review the progress of our Vector store database discussion and ensure we're on track to meet our Target low latency requirements for the project. Okay, what Vector store databases options do we have? And which one do you suggest we use? We are currently considering using either rag vector or another option that meets our Target low latency requirements. However, I would like to review the database Benchmark reviews and confirm which one is most suitable for our project before making a final decision. The vector store databases options discussion has already been completed, but we need to re-evaluate the current status of each option. Okay. In that case, let me ask you this is rag even necessary. And then in conjunction, would a vector store even be necessary? I'm not sure what you mean by in conjunction with the vector store. Can you clarify or provide more context about how this would be necessary? I am asking you if rag is necessary and in addition to that will Vector store also be necessary.",
+          "utterance_id": "f1429f09-ab0a-4dd1-9883-e0838e503f7e"
+        }
+      ],
+      "notes": []
+    }
   }
 ]
