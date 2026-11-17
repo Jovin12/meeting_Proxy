@@ -131,12 +131,24 @@ async function openSocket(id) {
     broadcastToSidePanel({ type: "state", state: msg });
   };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       console.log("[bg] socket closed");
       stopKeepAlive();
       broadcastToSidePanel({ type: "ws-status", open: false });
       if (!opened) reject(new Error("WebSocket closed before connecting"));
-      scheduleReconnect();
+
+      if (event.code === 4404 && meetingId === id) {
+        meetingId = null;
+        lastState = null;
+        reconnectAttempt = 0;
+        broadcastToSidePanel({
+          type: "meeting-unavailable",
+          detail: "The meeting is no longer active. Start a new meeting.",
+        });
+        return;
+      }
+
+      if (meetingId === id) scheduleReconnect();
     };
 
     ws.onerror = (e) => {
@@ -158,7 +170,11 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
     if (!meetingId) return;
-    await openSocket(meetingId);
+    try {
+      await openSocket(meetingId);
+    } catch (error) {
+      console.warn("[bg] reconnect attempt failed:", error);
+    }
   }, delay);
 }
 

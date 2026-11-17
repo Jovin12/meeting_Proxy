@@ -8,9 +8,10 @@ The main experience is a Manifest V3 browser extension. It captures finalized
 Google Meet captions and displays the live transcript and note status in a
 custom panel. The panel separates meeting notes from **User Proxy**, which can
 switch Meet's outgoing audio between its selected microphone and generated
-Pocket TTS speech. The User Proxy also generates transcript-grounded question
-suggestions that can be selected and spoken through the same audio path. Ollama
-and semantic retrieval provide evidence for note classification.
+Pocket TTS speech. The **User Profile** tab edits the participant's background
+and tasks, which Ollama uses to personalize transcript-grounded suggested
+questions. Questions can be selected and spoken through the same audio path.
+Ollama and semantic retrieval provide evidence for note classification.
 
 ## High-Level Architecture
 
@@ -95,9 +96,9 @@ The API runs at `http://127.0.0.1:8000`.
 6. Click the Meeting Proxy extension action to open the custom panel on the
   right side of the Google Meet tab.
 7. In **Minutes of the Meeting**, optionally enter notes or upload a
-  `.txt`/`.md` file, then select **Start meeting**. Use **User Proxy** to
-  refresh transcript-based question suggestions, select one, choose TTS as
-  the audio source, and select **Speak**.
+  `.txt`/`.md` file, then select **Start meeting**. Edit your background and
+  tasks in **User Profile**. In **User Proxy**, refresh personalized question
+  suggestions, select one, set the microphone/TTS mix, and select **Speak**.
 
 The extension uses these local defaults:
 
@@ -209,9 +210,11 @@ POST /meeting/{meeting_id}/questions
 ```
 
 Uses the meeting's transcript so far and local Ollama to return exactly three
-concise questions as `{"questions": ["...", "...", "..."]}`. The User Proxy
-requests suggestions when opened and refreshes them after new transcript
-events while the tab is visible.
+concise questions as `{"questions": ["...", "...", "..."]}`. The participant
+profile from `backend/data/user_profile.json` is used to personalize the
+questions while keeping meeting-specific facts grounded in the transcript.
+The User Proxy requests suggestions when opened and refreshes them after new
+transcript events while the tab is visible.
 
 Flat convenience routes are also available at `/meeting/state`,
 `/meeting/end`, and `/meeting/event` for the newest meeting.
@@ -231,6 +234,17 @@ GET /meetings/{meeting_id}
 unchanged notes retain their analysis, new notes start as `open`, and removed
 notes are removed. `GET /meetings` lists saved meetings newest first, while
 `GET /meetings/{meeting_id}` returns the saved transcript and note state.
+
+### Manage the user profile
+
+```http
+GET /user-profile
+PUT /user-profile
+```
+
+These endpoints read and update `backend/data/user_profile.json`, including
+the user's name, background, and tasks with statuses. Suggested-question
+generation reads the saved profile for each request.
 
 ## Repository Layout
 
@@ -254,7 +268,7 @@ Important runtime files include:
 - `backend/app/retriever.py`: transcript chunking, embeddings, and ChromaDB
   search.
 - `backend/app/llm.py`: Ollama prompts and structured response validation for
-  note classifications and question suggestions.
+  note classifications and profile-personalized question suggestions.
 - `extension/content.js`: Google Meet caption observer.
 - `extension/background.js`: backend session and WebSocket relay.
 - `extension/meet_audio_bridge.js`: experimental Meet outgoing-audio bridge.
@@ -263,6 +277,8 @@ Important runtime files include:
   action.
 - `backend/data/meeting_history.json`: persisted meeting snapshots and UTC
   timestamps for review.
+- `backend/data/user_profile.json`: profile context used to personalize
+  suggested questions.
 
 ## Limitations
 

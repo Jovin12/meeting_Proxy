@@ -55,6 +55,7 @@
     }
 
     button,
+    input,
     textarea,
     select {
       color: inherit;
@@ -74,6 +75,7 @@
 
     button:focus-visible,
     summary:focus-visible,
+    input:focus-visible,
     textarea:focus-visible,
     select:focus-visible {
       outline: 2px solid var(--ice);
@@ -140,7 +142,7 @@
 
     .tab-list {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 4px;
       margin-top: 14px;
       border-bottom: 1px solid var(--line);
@@ -158,6 +160,19 @@
       font-weight: 650;
       line-height: 1.25;
       overflow-wrap: anywhere;
+    }
+
+    .tab-button-content {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .tab-icon {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
     }
 
     .tab-button[aria-selected="true"] {
@@ -492,66 +507,41 @@
       opacity: 0.58;
     }
 
-    .source-switch {
+    .mix-controls {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .mix-levels {
       display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 10px;
-      width: fit-content;
-      min-height: 44px;
-      margin-top: 8px;
+      justify-content: space-between;
+      gap: 12px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 600;
     }
 
-    .source-switch[data-mode="microphone"] #microphoneModeLabel,
-    .source-switch[data-mode="tts"] #ttsModeLabel {
+    .mix-levels output {
       color: var(--ice);
+      font-family: var(--font-mono);
+      font-size: 11px;
     }
 
-    .source-toggle {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex: 0 0 auto;
+    .mix-slider {
+      width: 100%;
+      min-height: 28px;
       margin: 0;
-      appearance: none;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--page-deep);
+      accent-color: var(--ice);
       cursor: pointer;
-      transition: background-color 140ms ease, border-color 140ms ease;
     }
 
-    .source-toggle::before {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--muted);
-      content: "";
-      transition: transform 140ms ease, background-color 140ms ease;
-    }
-
-    .source-toggle:checked {
-      border-color: var(--ice);
-      background: rgb(2 253 246 / 14%);
-    }
-
-    .source-toggle:checked::before {
-      transform: translateX(20px);
-      background: var(--ice);
-    }
-
-    .source-toggle:disabled {
+    .mix-slider:disabled {
       cursor: not-allowed;
       opacity: 0.58;
     }
 
-    .source-toggle:focus-visible {
+    .mix-slider:focus-visible {
       outline: 2px solid var(--ice);
       outline-offset: 3px;
     }
@@ -776,7 +766,9 @@
     }
 
     .notes-input,
-    .history-select {
+    .history-select,
+    .profile-input,
+    .profile-task-status {
       display: block;
       width: 100%;
       min-width: 0;
@@ -787,6 +779,81 @@
       background: var(--page-deep);
       color: var(--text);
       font-size: 14px;
+    }
+
+    .profile-input,
+    .profile-task-status {
+      padding: 10px 12px;
+    }
+
+    .profile-field .profile-input,
+    .profile-field .profile-task-status {
+      margin-top: 2px;
+    }
+
+    .profile-background {
+      min-height: 120px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .profile-form {
+      display: grid;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .profile-form[hidden] {
+      display: none;
+    }
+
+    .profile-field {
+      display: grid;
+      gap: 4px;
+    }
+
+    .profile-tasks {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    #profileTasks {
+      display: grid;
+      gap: 10px;
+    }
+
+    .profile-tasks-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .profile-tasks-heading .section-title {
+      font-size: 20px;
+    }
+
+    .profile-task-row {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-control);
+      background: var(--page-deep);
+    }
+
+    .profile-task-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .profile-task-actions {
+      display: flex;
+      justify-content: flex-end;
     }
 
     .notes-input {
@@ -896,6 +963,15 @@
     <div class="tab-list" role="tablist" aria-label="Meeting Proxy views">
       <button class="tab-button" id="minutesTab" type="button" role="tab" aria-controls="minutesPanel" aria-selected="true" tabindex="0">Minutes of the Meeting</button>
       <button class="tab-button" id="userProxyTab" type="button" role="tab" aria-controls="userProxyPanel" aria-selected="false" tabindex="-1">User Proxy</button>
+      <button class="tab-button" id="profileTab" type="button" role="tab" aria-controls="profilePanel" aria-selected="false" tabindex="-1" aria-label="User Profile">
+        <span class="tab-button-content">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.5"></circle>
+            <path d="M5 20c.5-3.5 3.2-5.5 7-5.5s6.5 2 7 5.5"></path>
+          </svg>
+          <span>Profile</span>
+        </span>
+      </button>
     </div>
 
     <section class="tab-panel" id="minutesPanel" role="tabpanel" aria-labelledby="minutesTab">
@@ -981,15 +1057,28 @@
         <header class="section-heading">
           <div>
             <h2 class="section-title" id="voiceMixHeading">Voice mix</h2>
-            <p class="notes-description">Choose which audio Meet sends</p>
+            <p class="notes-description">Balance your microphone with generated speech</p>
           </div>
         </header>
         <button class="button button-secondary" id="toggleAudioMixer" type="button">Enable microphone mix</button>
-        <label class="source-switch" id="sourceSwitch" data-mode="microphone">
-          <span id="microphoneModeLabel">Microphone</span>
-          <input class="source-toggle" id="sourceMode" type="checkbox" role="switch" aria-label="Choose generated speech instead of microphone" aria-checked="false" disabled>
-          <span id="ttsModeLabel">TTS</span>
-        </label>
+        <div class="mix-controls">
+          <div class="mix-levels" aria-hidden="true">
+            <span>Microphone <output id="microphoneMixValue">100%</output></span>
+            <span>TTS <output id="ttsMixValue">0%</output></span>
+          </div>
+          <input
+            class="mix-slider"
+            id="voiceMix"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="0"
+            aria-label="TTS volume; microphone volume is the remainder"
+            aria-valuetext="Microphone 100%, TTS 0%"
+            disabled
+          >
+        </div>
         <div class="speech-controls">
           <label class="editor-label" for="speechText">Text to speak</label>
           <textarea class="speech-input" id="speechText" placeholder="Enter a sentence" disabled></textarea>
@@ -997,6 +1086,37 @@
             <button class="button button-primary" id="speak" type="button" disabled>Speak</button>
           </div>
         </div>
+      </section>
+    </section>
+
+    <section class="tab-panel" id="profilePanel" role="tabpanel" aria-labelledby="profileTab" hidden>
+      <section class="section" aria-labelledby="profileHeading">
+        <header class="section-heading">
+          <div>
+            <h2 class="section-title" id="profileHeading">User profile</h2>
+            <p class="notes-description">Personalize questions with your background and current tasks.</p>
+          </div>
+        </header>
+        <p class="empty-state" id="profileLoading">Loading profile…</p>
+        <form class="profile-form" id="profileForm" hidden>
+          <label class="profile-field">
+            <span class="editor-label">Name</span>
+            <input class="profile-input" id="profileName" name="name" type="text" autocomplete="name" required>
+          </label>
+          <label class="profile-field">
+            <span class="editor-label">Background</span>
+            <textarea class="profile-input profile-background" id="profileBackground" name="background"></textarea>
+          </label>
+          <fieldset class="profile-tasks">
+            <legend class="sr-only">Current tasks</legend>
+            <div class="profile-tasks-heading">
+              <h3 class="section-title">Current tasks</h3>
+              <button class="button button-quiet" id="addProfileTask" type="button" disabled>Add task</button>
+            </div>
+            <div id="profileTasks" aria-live="polite"></div>
+          </fieldset>
+          <button class="button button-primary" id="saveProfile" type="submit">Save profile</button>
+        </form>
       </section>
     </section>
 

@@ -3,6 +3,8 @@ const $ = (id) => document.getElementById(id);
 const notesInput = $("notesInput");
 const notesFieldset = $("notesFieldset");
 const historySelect = $("history");
+const profileForm = $("profileForm");
+const profileTasks = $("profileTasks");
 const transcriptList = $("transcript");
 const notesList = $("notes");
 const startButton = $("start");
@@ -24,6 +26,7 @@ let questionRequestSequence = 0;
 let lastQuestionTranscriptCount = 0;
 let questionRefreshTimer = null;
 let questionsLoading = false;
+let userProfileLoaded = false;
 
 async function getBackendUrl() {
   const { backendUrl = "http://127.0.0.1:8000" } = await chrome.storage.sync.get({
@@ -35,7 +38,7 @@ async function getBackendUrl() {
 class AudioMixer {
   constructor() {
     this.enabled = false;
-    this.mode = "microphone";
+    this.ttsPercent = 0;
     this.pendingRequests = new Map();
     this.requestSequence = 0;
     window.addEventListener("message", (event) => {
@@ -43,7 +46,9 @@ class AudioMixer {
       if (event.data?.source !== "meeting-proxy-audio-bridge" || event.data.type !== "state") return;
 
       this.enabled = event.data.enabled === true;
-      this.mode = event.data.mode === "tts" ? "tts" : "microphone";
+      if (Number.isFinite(event.data.ttsPercent)) {
+        this.ttsPercent = event.data.ttsPercent;
+      }
       updateAudioMixerUI();
       if (event.data.requestId) {
         const pending = this.pendingRequests.get(event.data.requestId);
@@ -58,8 +63,6 @@ class AudioMixer {
         setStatus(`Meet audio bridge error. ${event.data.error}`, "error");
       } else if (this.enabled && event.data.senderCount === 0) {
         setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
-      } else if (this.enabled) {
-        setStatus(this.mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
       }
     });
   }
@@ -94,13 +97,12 @@ class AudioMixer {
     return this.request("disable");
   }
 
-  async setMode(mode) {
-    return this.request("mode", { mode });
+  async setMix(ttsPercent) {
+    return this.request("mix", { ttsPercent });
   }
 
   async speak(text) {
     if (!this.enabled) throw new Error("Enable the microphone mix first.");
-    if (this.mode !== "tts") throw new Error("Switch the audio source to TTS before speaking.");
 
     const response = await fetch(`${await getBackendUrl()}/generate-tts`, {
       method: "POST",
@@ -121,15 +123,17 @@ const audioMixer = new AudioMixer();
 
 function updateAudioMixerUI() {
   const active = audioMixer.isActive;
-  const ttsSelected = active && audioMixer.mode === "tts";
+  const ttsPercent = Math.round(audioMixer.ttsPercent);
+  const microphonePercent = 100 - ttsPercent;
   $("toggleAudioMixer").textContent = active ? "Disable microphone mix" : "Enable microphone mix";
   $("toggleAudioMixer").setAttribute("aria-pressed", String(active));
-  $("sourceMode").checked = audioMixer.mode === "tts";
-  $("sourceMode").setAttribute("aria-checked", String(audioMixer.mode === "tts"));
-  $("sourceMode").disabled = !active;
-  $("sourceSwitch").dataset.mode = audioMixer.mode;
-  $("speechText").disabled = !ttsSelected;
-  $("speak").disabled = !ttsSelected;
+  $("voiceMix").value = String(ttsPercent);
+  $("voiceMix").disabled = !active;
+  $("voiceMix").setAttribute("aria-valuetext", `Microphone ${microphonePercent}%, TTS ${ttsPercent}%`);
+  $("microphoneMixValue").value = `${microphonePercent}%`;
+  $("ttsMixValue").value = `${ttsPercent}%`;
+  $("speechText").disabled = !active;
+  $("speak").disabled = !active;
   $("refreshQuestions").disabled = questionsLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
   $("questionsList").disabled = questionsLoading || !suggestedQuestions.length || !isMeetingActive || isReviewingHistory;
 }
@@ -173,7 +177,7 @@ async function toggleAudioMixer() {
     } else {
       setStatus("Connecting to the Meet microphone sender…");
       const state = await audioMixer.start();
-      audioMixer.mode = state.mode === "tts" ? "tts" : "microphone";
+      audioMixer.ttsPercent = Number.isFinite(state.ttsPercent) ? state.ttsPercent : 0;
       if (state.senderCount > 0) setStatus("Microphone selected for Meet.", "success");
       else setStatus("Mixer enabled. Turn on the Meet microphone to route audio.");
     }
@@ -185,17 +189,16 @@ async function toggleAudioMixer() {
   }
 }
 
-async function changeAudioMode(event) {
-  const toggle = event.currentTarget;
-  const mode = toggle.checked ? "tts" : "microphone";
-  toggle.disabled = true;
+async function changeVoiceMix(event) {
+  const slider = event.currentTarget;
+  const ttsPercent = Number(slider.value);
   try {
-    const state = await audioMixer.setMode(mode);
-    audioMixer.mode = state.mode;
-    setStatus(mode === "tts" ? "Generated speech selected for Meet." : "Microphone selected for Meet.", "success");
+    const state = await audioMixer.setMix(ttsPercent);
+    audioMixer.ttsPercent = state.ttsPercent;
+    setStatus(`Voice mix updated: microphone ${100 - ttsPercent}%, TTS ${ttsPercent}%.`, "success");
   } catch (error) {
-    toggle.checked = audioMixer.mode === "tts";
-    setStatus(`Could not switch the audio source. ${error.message}`, "error");
+    updateAudioMixerUI();
+    setStatus(`Could not update the voice mix. ${error.message}`, "error");
   } finally {
     updateAudioMixerUI();
   }
@@ -219,7 +222,7 @@ async function speakText() {
     setStatus(`Could not generate speech. ${error.message}`, "error");
   } finally {
     button.textContent = "Speak";
-    button.disabled = !audioMixer.isActive;
+    updateAudioMixerUI();
   }
 }
 
@@ -487,8 +490,125 @@ function renderSuggestedQuestions(message = "") {
   });
 }
 
+function createProfileTaskRow(task = {}) {
+  const row = createTextElement("div", "profile-task-row", "");
+  const fields = createTextElement("div", "profile-task-fields", "");
+  const titleLabel = createTextElement("label", "profile-field", "");
+  const titleCaption = createTextElement("span", "editor-label", "Task");
+  const titleInput = document.createElement("input");
+  titleInput.className = "profile-input";
+  titleInput.name = "task-title";
+  titleInput.type = "text";
+  titleInput.value = task.title || "";
+  titleInput.required = true;
+  titleLabel.append(titleCaption, titleInput);
+
+  const statusLabel = createTextElement("label", "profile-field", "");
+  const statusCaption = createTextElement("span", "editor-label", "Status");
+  const statusSelect = document.createElement("select");
+  statusSelect.className = "profile-task-status";
+  statusSelect.name = "task-status";
+  const statuses = ["in_progress", "completed"];
+  if (task.status && !statuses.includes(task.status)) statuses.unshift(task.status);
+  for (const status of statuses) {
+    const option = new Option(status.replaceAll("_", " "), status);
+    statusSelect.add(option);
+  }
+  statusSelect.value = task.status || "in_progress";
+  statusLabel.append(statusCaption, statusSelect);
+
+  const actions = createTextElement("div", "profile-task-actions", "");
+  const removeButton = createTextElement("button", "button button-quiet", "Remove");
+  removeButton.type = "button";
+  removeButton.setAttribute("aria-label", `Remove task ${task.title || ""}`);
+  removeButton.addEventListener("click", () => row.remove());
+
+  fields.append(titleLabel, statusLabel);
+  actions.append(removeButton);
+  row.append(fields, actions);
+  return row;
+}
+
+function renderProfile(profile) {
+  $("profileName").value = profile.name || "";
+  $("profileBackground").value = profile.background || "";
+  profileTasks.replaceChildren(...(profile.tasks || []).map(createProfileTaskRow));
+  if (!profileTasks.childElementCount) {
+    profileTasks.append(createTextElement("p", "empty-state", "No current tasks. Add one if it is relevant to your meetings."));
+  }
+  $("profileLoading").hidden = true;
+  profileForm.hidden = false;
+  $("addProfileTask").disabled = false;
+  userProfileLoaded = true;
+}
+
+async function loadUserProfile() {
+  const response = await fetch(`${await getBackendUrl()}/user-profile`);
+  const profile = await response.json();
+  if (!response.ok) {
+    throw new Error(profile.detail || `Profile request failed (${response.status}).`);
+  }
+  renderProfile(profile);
+}
+
+async function saveUserProfile(event) {
+  event.preventDefault();
+  if (!userProfileLoaded) return;
+
+  const saveButton = $("saveProfile");
+  profileForm.querySelectorAll("input, textarea, select, button").forEach((control) => {
+    control.disabled = true;
+  });
+  saveButton.textContent = "Saving…";
+  setStatus("Saving user profile…");
+  const profile = {
+    name: $("profileName").value.trim(),
+    background: $("profileBackground").value.trim(),
+    tasks: Array.from(profileTasks.querySelectorAll(".profile-task-row"), (row) => ({
+      title: row.querySelector('[name="task-title"]').value.trim(),
+      status: row.querySelector('[name="task-status"]').value,
+    })),
+  };
+
+  try {
+    const response = await fetch(`${await getBackendUrl()}/user-profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
+    const savedProfile = await response.json();
+    if (!response.ok) {
+      throw new Error(savedProfile.detail || `Profile save failed (${response.status}).`);
+    }
+    renderProfile(savedProfile);
+    let questionsRefreshed = null;
+    if (isMeetingActive && !isReviewingHistory && latestLiveState?.transcript?.length) {
+      questionsRefreshed = await loadSuggestedQuestions();
+    }
+    setStatus(
+      questionsRefreshed === false
+        ? "Profile saved, but suggested questions could not be refreshed."
+        : questionsRefreshed
+          ? "Profile saved and suggested questions refreshed."
+          : "User profile saved.",
+      questionsRefreshed === false ? "error" : "success",
+    );
+  } catch (error) {
+    setStatus(`Could not save user profile. ${error.message}`, "error");
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "Save profile";
+    $("profileName").disabled = false;
+    $("profileBackground").disabled = false;
+    $("addProfileTask").disabled = false;
+    profileTasks.querySelectorAll("input, select, button").forEach((control) => {
+      control.disabled = false;
+    });
+  }
+}
+
 async function loadSuggestedQuestions() {
-  if (!currentMeetingId || !isMeetingActive || isReviewingHistory) return;
+  if (!currentMeetingId || !isMeetingActive || isReviewingHistory) return false;
 
   const meetingId = currentMeetingId;
   const requestSequence = ++questionRequestSequence;
@@ -510,14 +630,17 @@ async function loadSuggestedQuestions() {
     if (suggestedQuestions.length) {
       $("speechText").value = suggestedQuestions[0];
       setStatus("Three questions are ready to ask.", "success");
+      return true;
     } else {
       renderSuggestedQuestions("No question suggestions were returned. Refresh to try again.");
+      return false;
     }
   } catch (error) {
     if (requestSequence !== questionRequestSequence) return;
     suggestedQuestions = [];
     renderSuggestedQuestions(`Could not load suggestions. ${error.message}`);
     setStatus(`Could not generate questions. ${error.message}`, "error");
+    return false;
   } finally {
     if (requestSequence === questionRequestSequence) {
       questionsLoading = false;
@@ -753,6 +876,18 @@ function onRuntimeMessage(message) {
     updateSessionUI();
     updateAudioMixerUI();
     setStatus("Meeting ended.", "success");
+  } else if (message.type === "meeting-unavailable") {
+    currentMeetingId = null;
+    isMeetingActive = false;
+    meetingHasEnded = true;
+    if (latestLiveState) {
+      latestLiveState = { ...latestLiveState, active: false };
+      if (!isReviewingHistory) renderMeetingState(latestLiveState);
+    }
+    setConnection(false);
+    updateSessionUI();
+    updateAudioMixerUI();
+    setStatus(message.detail || "The meeting is no longer active. Start a new meeting.", "error");
   }
 }
 
@@ -792,7 +927,14 @@ for (const tab of viewTabs) {
 }
 $("toggleAudioMixer").addEventListener("click", toggleAudioMixer);
 $("speak").addEventListener("click", speakText);
-$("sourceMode").addEventListener("change", changeAudioMode);
+$("voiceMix").addEventListener("input", changeVoiceMix);
+$("addProfileTask").addEventListener("click", () => {
+  profileTasks.querySelector(".empty-state")?.remove();
+  const row = createProfileTaskRow();
+  profileTasks.append(row);
+  row.querySelector('[name="task-title"]').focus();
+});
+profileForm.addEventListener("submit", saveUserProfile);
 $("refreshQuestions").addEventListener("click", () => scheduleQuestionSuggestions(true));
 $("questionsList").addEventListener("change", (event) => {
   const radio = event.target.closest('input[name="suggestedQuestion"]');
@@ -859,6 +1001,13 @@ async function initialize() {
     await loadHistory();
   } catch (error) {
     if (!latestLiveState) setStatus(`Saved meetings unavailable. ${error.message}`, "error");
+  }
+
+  try {
+    await loadUserProfile();
+  } catch (error) {
+    $("profileLoading").textContent = `Could not load user profile. ${error.message}`;
+    setStatus(`User profile unavailable. ${error.message}`, "error");
   }
 }
 

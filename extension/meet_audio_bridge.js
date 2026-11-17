@@ -16,7 +16,7 @@
   let microphoneGain = null;
   let ttsGain = null;
   let enabled = false;
-  let mode = "microphone";
+  let ttsPercent = 0;
 
   function mixedTrack() {
     return destination?.stream.getAudioTracks()[0] ?? null;
@@ -28,7 +28,7 @@
       type: "state",
       requestId,
       enabled,
-      mode,
+      ttsPercent,
       senderCount: senderOriginalTracks.size,
       error,
     }, location.origin);
@@ -70,8 +70,9 @@
     destination = context.createMediaStreamDestination();
     microphoneGain = context.createGain();
     ttsGain = context.createGain();
-    microphoneGain.gain.value = 1;
-    ttsGain.gain.value = 0;
+    ttsPercent = 0;
+    microphoneGain.gain.value = 1 - ttsPercent / 100;
+    ttsGain.gain.value = ttsPercent / 100;
     microphoneGain.connect(destination);
     ttsGain.connect(destination);
     enabled = true;
@@ -85,7 +86,7 @@
 
   async function disableMix() {
     enabled = false;
-    mode = "microphone";
+    ttsPercent = 0;
     for (const [sender, originalTrack] of senderOriginalTracks) {
       try {
         await nativeReplaceTrack.call(sender, originalTrack);
@@ -112,12 +113,12 @@
   }
 
   async function playTts(audioData) {
-    if (!enabled || mode !== "tts" || !audioContext || Object.prototype.toString.call(audioData) !== "[object ArrayBuffer]") {
-      throw new Error("Switch the audio source to TTS before speaking.");
+    if (!enabled || !audioContext || Object.prototype.toString.call(audioData) !== "[object ArrayBuffer]") {
+      throw new Error("Enable the microphone mix before speaking.");
     }
 
     const buffer = await audioContext.decodeAudioData(audioData);
-    if (!enabled || mode !== "tts") throw new Error("TTS mode was switched off before playback started.");
+    if (!enabled || !audioContext) throw new Error("The microphone mix was disabled before playback started.");
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(ttsGain);
@@ -129,26 +130,17 @@
     source.start();
   }
 
-  function stopTtsSources() {
-    for (const source of ttsSources) {
-      try {
-        source.stop();
-      } catch {
-      }
-      source.disconnect();
+  function setMix(nextTtsPercent) {
+    if (!enabled || !audioContext) throw new Error("Enable the microphone mix before adjusting the mix.");
+    if (!Number.isFinite(nextTtsPercent) || nextTtsPercent < 0 || nextTtsPercent > 100) {
+      throw new Error("Mix percentage must be between 0 and 100.");
     }
-    ttsSources.clear();
-  }
 
-  function setMode(nextMode) {
-    if (!enabled || !audioContext) throw new Error("Enable the microphone mix before switching its source.");
-    if (nextMode !== "microphone" && nextMode !== "tts") throw new Error("Unknown audio source.");
-
-    mode = nextMode;
+    ttsPercent = nextTtsPercent;
     const now = audioContext.currentTime;
-    microphoneGain.gain.setValueAtTime(mode === "microphone" ? 1 : 0, now);
-    ttsGain.gain.setValueAtTime(mode === "tts" ? 1 : 0, now);
-    if (mode === "microphone") stopTtsSources();
+    const smoothingTime = 0.015;
+    microphoneGain.gain.setTargetAtTime(1 - ttsPercent / 100, now, smoothingTime);
+    ttsGain.gain.setTargetAtTime(ttsPercent / 100, now, smoothingTime);
   }
 
   if (NativePeerConnection && nativeReplaceTrack) {
@@ -207,7 +199,7 @@
       if (message.type === "enable") await enableMix();
       else if (message.type === "disable") await disableMix();
       else if (message.type === "speak") await playTts(message.audio);
-      else if (message.type === "mode") setMode(message.mode);
+      else if (message.type === "mix") setMix(message.ttsPercent);
       else return;
       publishState(message.requestId);
     } catch (error) {
