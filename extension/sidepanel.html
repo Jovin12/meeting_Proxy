@@ -1040,6 +1040,19 @@
     </section>
 
     <section class="tab-panel" id="userProxyPanel" role="tabpanel" aria-labelledby="userProxyTab" hidden>
+      <section class="questions-section" aria-labelledby="responseHeading">
+        <header class="section-heading">
+          <div>
+            <h2 class="section-title" id="responseHeading">Suggested response</h2>
+            <p class="notes-description">A concise reply grounded in the live transcript</p>
+          </div>
+          <button class="button button-quiet" id="refreshResponse" type="button" disabled>Refresh</button>
+        </header>
+        <fieldset class="questions-list" id="responseList" aria-label="Choose a suggested response" disabled>
+          <legend class="sr-only">Choose a suggested response</legend>
+          <p class="empty-state" id="responseEmpty">Start a meeting to get a suggested response.</p>
+        </fieldset>
+      </section>
       <section class="questions-section" aria-labelledby="questionsHeading">
         <header class="section-heading">
           <div>

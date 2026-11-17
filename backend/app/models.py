@@ -1,6 +1,7 @@
+import re
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class NoteStatus(str, Enum):
@@ -52,6 +53,23 @@ class NotesUpdateRequest(BaseModel):
 
 class SuggestedQuestions(BaseModel):
     questions: list[str] = Field(min_length=3, max_length=3)
+
+
+class SuggestedResponse(BaseModel):
+    responses: list[str] = Field(min_length=3, max_length=3)
+
+    @field_validator("responses")
+    @classmethod
+    def validate_response_sentences(cls, responses: list[str]) -> list[str]:
+        for response in responses:
+            sentences = [
+                sentence
+                for sentence in re.split(r"(?<=[.!?])\s+", response.strip())
+                if sentence
+            ]
+            if not 1 <= len(sentences) <= 3:
+                raise ValueError("Each suggested response must contain 1 to 3 sentences.")
+        return responses
 
 
 class UserProfileTask(BaseModel):

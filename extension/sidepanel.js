@@ -21,11 +21,14 @@ let latestLiveState = null;
 let notesDirty = false;
 let savedMeetings = [];
 let suggestedQuestions = [];
-let selectedQuestionIndex = 0;
+let suggestedResponses = [];
+let selectedSuggestion = null;
 let questionRequestSequence = 0;
+let responseRequestSequence = 0;
 let lastQuestionTranscriptCount = 0;
 let questionRefreshTimer = null;
 let questionsLoading = false;
+let responseLoading = false;
 let userProfileLoaded = false;
 
 async function getBackendUrl() {
@@ -135,7 +138,9 @@ function updateAudioMixerUI() {
   $("speechText").disabled = !active;
   $("speak").disabled = !active;
   $("refreshQuestions").disabled = questionsLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
+  $("refreshResponse").disabled = responseLoading || !isMeetingActive || !currentMeetingId || isReviewingHistory || !latestLiveState?.transcript?.length;
   $("questionsList").disabled = questionsLoading || !suggestedQuestions.length || !isMeetingActive || isReviewingHistory;
+  $("responseList").disabled = responseLoading || !suggestedResponses.length || !isMeetingActive || isReviewingHistory;
 }
 
 const viewTabs = Array.from(document.querySelectorAll('[role="tab"]'));
@@ -481,13 +486,56 @@ function renderSuggestedQuestions(message = "") {
     label.className = "question-option";
     const radio = document.createElement("input");
     radio.type = "radio";
-    radio.name = "suggestedQuestion";
+    radio.name = "suggestedUtterance";
+    radio.dataset.suggestionType = "question";
     radio.value = String(index);
-    radio.checked = index === selectedQuestionIndex;
+    radio.checked = selectedSuggestion?.type === "question" && selectedSuggestion.index === index;
     const text = createTextElement("span", "", question);
     label.append(radio, text);
     list.appendChild(label);
   });
+}
+
+function renderSuggestedResponse(message = "") {
+  const list = $("responseList");
+  const legend = list.querySelector("legend");
+  list.replaceChildren(legend);
+
+  if (!suggestedResponses.length) {
+    list.appendChild(createTextElement("p", "empty-state", message || "A suggested response will appear here."));
+    return;
+  }
+
+  suggestedResponses.forEach((response, index) => {
+    const label = document.createElement("label");
+    label.className = "question-option";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "suggestedUtterance";
+    radio.dataset.suggestionType = "response";
+    radio.value = String(index);
+    radio.checked = selectedSuggestion?.type === "response" && selectedSuggestion.index === index;
+    const text = createTextElement("span", "", response);
+    label.append(radio, text);
+    list.appendChild(label);
+  });
+}
+
+function selectSuggestedUtterance(event) {
+  const radio = event.target.closest('input[name="suggestedUtterance"]');
+  if (!radio) return;
+
+  const index = Number(radio.value);
+  const options = radio.dataset.suggestionType === "response"
+    ? suggestedResponses
+    : suggestedQuestions;
+  const text = options[index];
+  if (typeof text !== "string") return;
+
+  selectedSuggestion = { type: radio.dataset.suggestionType, index };
+  $("speechText").value = text;
+  renderSuggestedQuestions();
+  renderSuggestedResponse();
 }
 
 function createProfileTaskRow(task = {}) {
@@ -581,17 +629,23 @@ async function saveUserProfile(event) {
       throw new Error(savedProfile.detail || `Profile save failed (${response.status}).`);
     }
     renderProfile(savedProfile);
-    let questionsRefreshed = null;
+    let suggestionsRefreshed = null;
     if (isMeetingActive && !isReviewingHistory && latestLiveState?.transcript?.length) {
-      questionsRefreshed = await loadSuggestedQuestions();
+      selectedSuggestion = null;
+      renderSuggestedQuestions();
+      renderSuggestedResponse();
+      suggestionsRefreshed = (await Promise.all([
+        loadSuggestedQuestions(),
+        loadSuggestedResponse(),
+      ])).every(Boolean);
     }
     setStatus(
-      questionsRefreshed === false
-        ? "Profile saved, but suggested questions could not be refreshed."
-        : questionsRefreshed
-          ? "Profile saved and suggested questions refreshed."
+      suggestionsRefreshed === false
+        ? "Profile saved, but suggestions could not be refreshed."
+        : suggestionsRefreshed
+          ? "Profile saved and suggestions refreshed."
           : "User profile saved.",
-      questionsRefreshed === false ? "error" : "success",
+      suggestionsRefreshed === false ? "error" : "success",
     );
   } catch (error) {
     setStatus(`Could not save user profile. ${error.message}`, "error");
@@ -625,10 +679,8 @@ async function loadSuggestedQuestions() {
     if (requestSequence !== questionRequestSequence || meetingId !== currentMeetingId) return;
 
     suggestedQuestions = Array.isArray(data.questions) ? data.questions : [];
-    selectedQuestionIndex = 0;
     renderSuggestedQuestions();
     if (suggestedQuestions.length) {
-      $("speechText").value = suggestedQuestions[0];
       setStatus("Three questions are ready to ask.", "success");
       return true;
     } else {
@@ -649,6 +701,43 @@ async function loadSuggestedQuestions() {
   }
 }
 
+async function loadSuggestedResponse() {
+  if (!currentMeetingId || !isMeetingActive || isReviewingHistory) return false;
+
+  const meetingId = currentMeetingId;
+  const requestSequence = ++responseRequestSequence;
+  responseLoading = true;
+  renderSuggestedResponse("Generating a suggested response…");
+  updateAudioMixerUI();
+
+  try {
+    const response = await fetch(`${await getBackendUrl()}/meeting/${encodeURIComponent(meetingId)}/response`, {
+      method: "POST",
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || `Response request failed (${response.status}).`);
+    if (requestSequence !== responseRequestSequence || meetingId !== currentMeetingId) return false;
+
+    suggestedResponses = Array.isArray(data.responses) ? data.responses : [];
+    renderSuggestedResponse(
+      suggestedResponses.length
+        ? ""
+        : "No suggested response was returned. Refresh to try again.",
+    );
+    return suggestedResponses.length === 3;
+  } catch (error) {
+    if (requestSequence !== responseRequestSequence) return false;
+    suggestedResponses = [];
+    renderSuggestedResponse(`Could not load a suggested response. ${error.message}`);
+    return false;
+  } finally {
+    if (requestSequence === responseRequestSequence) {
+      responseLoading = false;
+      updateAudioMixerUI();
+    }
+  }
+}
+
 function scheduleQuestionSuggestions(force = false) {
   const transcriptCount = latestLiveState?.transcript?.length || 0;
   if (!currentMeetingId || !isMeetingActive || isReviewingHistory || !transcriptCount) return;
@@ -656,7 +745,12 @@ function scheduleQuestionSuggestions(force = false) {
 
   lastQuestionTranscriptCount = transcriptCount;
   clearTimeout(questionRefreshTimer);
-  questionRefreshTimer = setTimeout(loadSuggestedQuestions, 1200);
+  selectedSuggestion = null;
+  renderSuggestedQuestions();
+  renderSuggestedResponse();
+  questionRefreshTimer = setTimeout(() => {
+    void Promise.all([loadSuggestedQuestions(), loadSuggestedResponse()]);
+  }, 1200);
 }
 
 function applyLiveState(state) {
@@ -664,11 +758,15 @@ function applyLiveState(state) {
   if (state.meeting_id && state.meeting_id !== latestLiveState?.meeting_id) {
     clearTimeout(questionRefreshTimer);
     questionRequestSequence += 1;
+    responseRequestSequence += 1;
     suggestedQuestions = [];
-    selectedQuestionIndex = 0;
+    suggestedResponses = [];
+    selectedSuggestion = null;
     lastQuestionTranscriptCount = 0;
     questionsLoading = false;
+    responseLoading = false;
     renderSuggestedQuestions("Start a meeting to get question suggestions.");
+    renderSuggestedResponse("Start a meeting to get a suggested response.");
   }
   latestLiveState = state;
   if (state.meeting_id) currentMeetingId = state.meeting_id;
@@ -936,11 +1034,12 @@ $("addProfileTask").addEventListener("click", () => {
 });
 profileForm.addEventListener("submit", saveUserProfile);
 $("refreshQuestions").addEventListener("click", () => scheduleQuestionSuggestions(true));
+$("refreshResponse").addEventListener("click", () => scheduleQuestionSuggestions(true));
+$("responseList").addEventListener("change", (event) => {
+  selectSuggestedUtterance(event);
+});
 $("questionsList").addEventListener("change", (event) => {
-  const radio = event.target.closest('input[name="suggestedQuestion"]');
-  if (!radio) return;
-  selectedQuestionIndex = Number(radio.value);
-  $("speechText").value = suggestedQuestions[selectedQuestionIndex] || "";
+  selectSuggestedUtterance(event);
 });
 window.addEventListener("beforeunload", () => {
   window.parent.postMessage({ source: "meeting-proxy-extension", type: "disable" }, "https://meet.google.com");

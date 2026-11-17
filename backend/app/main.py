@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from .matcher import load_notes, load_transcript
 from .retriever import TranscriptRetriever
-from .llm import classify_note, suggest_questions
+from .llm import classify_note, suggest_questions, suggest_response
 from .models import (
     Note,
     NoteStatus,
@@ -21,6 +21,7 @@ from .models import (
     TranscriptEvent,
     MeetingState,
     SuggestedQuestions,
+    SuggestedResponse,
     UserProfile,
 )
 from .state_engine import MeetingStateEngine
@@ -297,21 +298,39 @@ def get_meeting_state(meeting_id: str):
     return _get_engine(meeting_id).get_state()
 
 
-@app.post("/meeting/{meeting_id}/questions", response_model=SuggestedQuestions)
-async def get_suggested_questions(meeting_id: str):
+def _meeting_transcript_text(meeting_id: str) -> str:
     engine = _get_engine(meeting_id)
     transcript = engine.state.transcript
     if not transcript:
-        raise HTTPException(400, "No transcript is available for question suggestions.")
+        raise HTTPException(400, "No transcript is available for suggestions.")
 
-    transcript_text = "\n".join(
+    return "\n".join(
         f"[{event.timestamp}] {event.speaker or 'Unknown'}: {event.text}"
         for event in transcript
     )
+
+
+@app.post("/meeting/{meeting_id}/questions", response_model=SuggestedQuestions)
+async def get_suggested_questions(meeting_id: str):
+    transcript_text = _meeting_transcript_text(meeting_id)
     try:
         user_profile = _load_user_profile()
         return await run_in_threadpool(
             suggest_questions,
+            transcript_text,
+            user_profile,
+        )
+    except ValueError as error:
+        raise HTTPException(502, str(error)) from error
+
+
+@app.post("/meeting/{meeting_id}/response", response_model=SuggestedResponse)
+async def get_suggested_response(meeting_id: str):
+    transcript_text = _meeting_transcript_text(meeting_id)
+    try:
+        user_profile = _load_user_profile()
+        return await run_in_threadpool(
+            suggest_response,
             transcript_text,
             user_profile,
         )

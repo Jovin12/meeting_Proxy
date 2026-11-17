@@ -721,5 +721,61 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "8e25f999-0ef7-422b-b0e5-7682ffaad6b9",
+    "started_at": "2026-11-17T17:03:57.986833+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "8e25f999-0ef7-422b-b0e5-7682ffaad6b9",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:39",
+          "speaker": "You",
+          "text": "Hello, how are you?"
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "8b5d9ea2-865e-4e64-a63e-676973c86448",
+    "started_at": "2026-11-17T17:12:13.134647+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "8b5d9ea2-865e-4e64-a63e-676973c86448",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:24",
+          "speaker": "You",
+          "text": "Hello, everyone."
+        },
+        {
+          "timestamp": "01:16",
+          "speaker": "You",
+          "text": "Hello, everyone. I'm ready to dive into the discussion about the current status of our bot's ability to perform duplex conversation."
+        }
+      ],
+      "notes": []
+    }
+  },
+  {
+    "meeting_id": "71265e92-e3e9-4fc2-bf8b-686162d74e94",
+    "started_at": "2026-11-17T17:17:33.998441+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "71265e92-e3e9-4fc2-bf8b-686162d74e94",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "00:19",
+          "speaker": "You",
+          "text": "Hi, everyone."
+        }
+      ],
+      "notes": []
+    }
   }
 ]

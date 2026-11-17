@@ -98,7 +98,8 @@ The API runs at `http://127.0.0.1:8000`.
 7. In **Minutes of the Meeting**, optionally enter notes or upload a
   `.txt`/`.md` file, then select **Start meeting**. Edit your background and
   tasks in **User Profile**. In **User Proxy**, refresh personalized question
-  suggestions, select one, set the microphone/TTS mix, and select **Speak**.
+  suggestions and a suggested response, select one to prepare speech, set the
+  microphone/TTS mix, and select **Speak**.
 
 The extension uses these local defaults:
 
@@ -216,6 +217,19 @@ questions while keeping meeting-specific facts grounded in the transcript.
 The User Proxy requests suggestions when opened and refreshes them after new
 transcript events while the tab is visible.
 
+### Suggest a response
+
+```http
+POST /meeting/{meeting_id}/response
+```
+
+Uses the meeting transcript and saved user profile to return one to three
+sentences for each of three response options as
+`{"responses": ["...", "...", "..."]}`. The User Proxy displays these above
+the suggested questions and refreshes both together. All six options share one radio selection: choosing any response or
+question deselects the others and replaces the text-to-speech input with that
+option's full text.
+
 Flat convenience routes are also available at `/meeting/state`,
 `/meeting/end`, and `/meeting/event` for the newest meeting.
 
@@ -244,7 +258,7 @@ PUT /user-profile
 
 These endpoints read and update `backend/data/user_profile.json`, including
 the user's name, background, and tasks with statuses. Suggested-question
-generation reads the saved profile for each request.
+and suggested-response generation read the saved profile for each request.
 
 ## Repository Layout
 

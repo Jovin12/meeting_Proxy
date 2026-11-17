@@ -515,7 +515,8 @@ The manifest host permissions must cover any backend URL that is configured.
 - `sidepanel.js` manages live and saved-meeting views, starts and ends
   meetings, edits or uploads notes, saves note changes, renders the live
   transcript, renders note status/evidence, and resynchronizes from the
-  service worker when reopened. It also implements accessible tab navigation,
+  service worker when reopened. It also loads transcript-grounded suggested
+  questions and a short suggested response, implements accessible tab navigation,
   sends TTS text to `/generate-tts`, transfers the returned WAV bytes to the
   page bridge, and controls the microphone/TTS mix percentage. While reviewing
   a saved meeting, the editor is disabled; **Return to live** restores the
@@ -524,9 +525,10 @@ The manifest host permissions must cover any backend URL that is configured.
 - `sidepanel.html` provides the custom panel UI. **Minutes of the Meeting**
   contains connection/session status, meeting controls, transcript, note
   matches, note editor, and saved-meeting history. **User Proxy** contains the
-  mixer enable control, microphone/TTS balance slider, text field, and
-  **Speak** button. **User Profile** contains editable name, background, and
-  task/status fields. These controls load from and save to the backend.
+  suggested response, suggested questions, mixer enable control,
+  microphone/TTS balance slider, text field, and **Speak** button.
+  **User Profile** contains editable name, background, and task/status fields.
+  These controls load from and save to the backend.
 - `extension/meet_audio_bridge.js` runs in the Google Meet page's MAIN world at
   `document_start`. It hooks `RTCPeerConnection` audio sender operations and
   connects Meet's selected outgoing microphone track and generated TTS to a
@@ -564,15 +566,19 @@ matching the Google Meet UI.
 5. Disabling the mixer or closing the panel asks the bridge to restore the
   original microphone track and close its audio graph.
 
-### User Profile and Suggested Questions
+### User Profile and Suggested Responses
 
 The **User Profile** tab reads and updates `backend/data/user_profile.json`
 through `GET /user-profile` and `PUT /user-profile`. The form exposes the
-profile name, background, and task titles/statuses. Each
-`POST /meeting/{meeting_id}/questions` request loads the saved profile and
-passes it to Ollama as personalization context; the current meeting transcript
-remains the source of meeting-specific facts. Saving profile changes during an
-active meeting refreshes its suggested questions.
+profile name, background, and task titles/statuses. The
+`POST /meeting/{meeting_id}/questions` and
+`POST /meeting/{meeting_id}/response` requests load the saved profile and pass
+it to Ollama as personalization context; the current meeting transcript
+remains the source of meeting-specific facts. Responses contain one to three
+response options, each containing one to three sentences. All question and
+response choices share one radio selection; selecting any option deselects the
+others and copies its full text into the text-to-speech field. Saving profile
+changes during an active meeting refreshes both suggestion sections.
 
 The extension page itself does not locally monitor the generated speech; it
 is routed to Meet's outgoing sender. Verify audibility with another meeting
