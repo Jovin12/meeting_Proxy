@@ -606,5 +606,22 @@
       ],
       "notes": []
     }
+  },
+  {
+    "meeting_id": "a00e3629-77df-4ab5-bd7c-910b59ec00f4",
+    "started_at": "2026-11-17T15:47:16.093788+00:00",
+    "ended_at": null,
+    "state": {
+      "meeting_id": "a00e3629-77df-4ab5-bd7c-910b59ec00f4",
+      "active": true,
+      "transcript": [
+        {
+          "timestamp": "01:47",
+          "speaker": "You",
+          "text": "Okay, let's get started."
+        }
+      ],
+      "notes": []
+    }
   }
 ]

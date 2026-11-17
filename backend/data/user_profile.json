@@ -1,0 +1,30 @@
+{
+  "name": "Jovin Antony",
+  "background": "AI/ML Engineer\nCurrently working on the meeting proxy  project. \nAnd we are in this meeting going to discuss on the current status of how the bot is able to perform duplex conversation, as in it is able to think and then stop its thinking if the user interrupts it, even if audio is already generated.",
+  "tasks": [
+    {
+      "title": "Check the database benchmarks",
+      "status": "completed"
+    },
+    {
+      "title": "Update task memory",
+      "status": "completed"
+    },
+    {
+      "title": "Review transcript",
+      "status": "completed"
+    },
+    {
+      "title": "Grounded sources for ragbot answers and questions",
+      "status": "completed"
+    },
+    {
+      "title": "Database benchmarks check",
+      "status": "completed"
+    },
+    {
+      "title": "Perform duplex Converse",
+      "status": "in_progress"
+    }
+  ]
+}
