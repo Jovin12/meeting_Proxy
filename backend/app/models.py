@@ -54,6 +54,17 @@ class SuggestedQuestions(BaseModel):
     questions: list[str] = Field(min_length=3, max_length=3)
 
 
+class UserProfileTask(BaseModel):
+    title: str = Field(min_length=1)
+    status: str = Field(min_length=1)
+
+
+class UserProfile(BaseModel):
+    name: str = Field(min_length=1)
+    background: str
+    tasks: list[UserProfileTask] = Field(default_factory=list)
+
+
 class MeetingState(BaseModel):
     meeting_id: str
     active: bool = True

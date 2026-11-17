@@ -21,6 +21,7 @@ from .models import (
     TranscriptEvent,
     MeetingState,
     SuggestedQuestions,
+    UserProfile,
 )
 from .state_engine import MeetingStateEngine
 
@@ -42,6 +43,7 @@ retriever = TranscriptRetriever()
 meeting_engines: dict[str, MeetingStateEngine] = {}
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 HISTORY_PATH = DATA_DIR / "meeting_history.json"
+USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
 
 
 def _load_history() -> list[dict]:
@@ -64,6 +66,18 @@ def _persist_history() -> None:
     with temporary_path.open("w", encoding="utf-8") as history_file:
         json.dump(meeting_history, history_file, indent=2)
     temporary_path.replace(HISTORY_PATH)
+
+
+def _load_user_profile() -> UserProfile:
+    try:
+        with USER_PROFILE_PATH.open("r", encoding="utf-8") as profile_file:
+            value = json.load(profile_file)
+        return UserProfile.model_validate(value)
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not load user profile: {error}",
+        ) from error
 
 
 def _save_meeting_state(state: MeetingState, ended_at: str | None = None) -> None:
@@ -181,6 +195,22 @@ def update_default_notes(request: NotesUpdateRequest):
     return {"notes": notes}
 
 
+@app.get("/user-profile", response_model=UserProfile)
+def get_user_profile():
+    return _load_user_profile()
+
+
+@app.put("/user-profile", response_model=UserProfile)
+def update_user_profile(profile: UserProfile):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path = USER_PROFILE_PATH.with_suffix(".tmp")
+    with temporary_path.open("w", encoding="utf-8") as profile_file:
+        json.dump(profile.model_dump(mode="json"), profile_file, indent=2)
+        profile_file.write("\n")
+    temporary_path.replace(USER_PROFILE_PATH)
+    return profile
+
+
 @app.get("/meetings")
 def list_meetings():
     return [
@@ -223,8 +253,10 @@ def get_meeting_state_flat():
 
 @app.post("/meeting/end")
 def end_meeting_flat():
-    state = _latest_engine().end_meeting()
+    engine = _latest_engine()
+    state = engine.end_meeting()
     _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
+    del meeting_engines[state.meeting_id]
     return state
 
 
@@ -277,15 +309,22 @@ async def get_suggested_questions(meeting_id: str):
         for event in transcript
     )
     try:
-        return await run_in_threadpool(suggest_questions, transcript_text)
+        user_profile = _load_user_profile()
+        return await run_in_threadpool(
+            suggest_questions,
+            transcript_text,
+            user_profile,
+        )
     except ValueError as error:
         raise HTTPException(502, str(error)) from error
 
 
 @app.post("/meeting/{meeting_id}/end")
 def end_meeting(meeting_id: str):
-    state = _get_engine(meeting_id).end_meeting()
+    engine = _get_engine(meeting_id)
+    state = engine.end_meeting()
     _save_meeting_state(state, datetime.now(timezone.utc).isoformat())
+    del meeting_engines[meeting_id]
     return state
 
 
@@ -308,7 +347,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: str):
     engine = meeting_engines.get(meeting_id)
     if engine is None:
         await websocket.send_json({"error": f"No meeting {meeting_id}"})
-        await websocket.close()
+        await websocket.close(code=4404, reason="Meeting not found")
         return
 
     # 1. Push current state immediately so the client renders without a round trip.

@@ -1,5 +1,20 @@
+from threading import Lock
+
 from sentence_transformers import SentenceTransformer
 import chromadb
+
+
+_embedding_model: SentenceTransformer | None = None
+_embedding_model_lock = Lock()
+
+
+def _get_embedding_model(model_name: str) -> SentenceTransformer:
+    global _embedding_model
+
+    with _embedding_model_lock:
+        if _embedding_model is None:
+            _embedding_model = SentenceTransformer(model_name)
+        return _embedding_model
 
 
 class TranscriptRetriever:
@@ -13,10 +28,7 @@ class TranscriptRetriever:
     WINDOW_SIZE = 3
 
     def __init__(self):
-        # Local embedding model
-        self.model = SentenceTransformer(
-            self.EMBEDDING_MODEL
-        )
+        self.model = _get_embedding_model(self.EMBEDDING_MODEL)
 
         # ChromaDB client
         self.client = chromadb.Client()
